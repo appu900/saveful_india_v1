@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  passwordHash String
+  phoneNumber  String? @unique
+  name         String
+
+  role      UserRole @default(USER)
+  stateCode String?
+  regionId  String?
+
+  tokenSet TokenSet?
+  sessions UserSession[]
+
+  dietaryProfile UserDietProfile?
+
+  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TokenSet {
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refershHash String?
+  updatedAt   DateTime @updatedAt
+}
+
+model UserSession {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device       String?
+  ipAddress    String?
+  userAgent    String?
+  lastActivity DateTime @default(now())
+  createdAt    DateTime @default(now())
+}
+
+model UserDietProfile {
+  userId        String     @id
+  user          User       @relation(fields: [userId], references: [id])
+
+  vegType       String
+  dairyFree     Boolean    @default(false)
+  nutFree       Boolean    @default(false)
+  glutenFree    Boolean    @default(false)
+  hasDiabetes   Boolean    @default(false)
+  otherAllergies String[]
+
+  updatedAt     DateTime   @updatedAt
+}
