@@ -4,6 +4,8 @@ import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './infra/database/prisma.module';
+import { SearchModule } from './modules/search/search.module';
+import { RedisModule } from './infra/cache/redis.module';
 
 @Module({
   imports: [
@@ -11,7 +13,9 @@ import { PrismaModule } from './infra/database/prisma.module';
       isGlobal: true,
     }),
     AuthModule,
-    PrismaModule
+    PrismaModule,
+    RedisModule,
+    SearchModule
   ],
   controllers: [AppController],
   providers: [AppService],

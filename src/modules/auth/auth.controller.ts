@@ -1,9 +1,18 @@
-import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/user-signup.dto';
 import { LoginDto } from './dto/user.login.dto';
 import { RefreshTokenDto } from './dto/user.refreshToken.dto';
 import { JwtAuthGuard } from './guards/jwt.auth.guard';
+import { RateLimit, RateLimitGuard } from '../../common/guards/rate-limit.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -35,5 +44,12 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@Req() req: any) {
     return this.authService.getMe(req.user.id);
+  }
+
+  @Get('test')
+  @RateLimit(3, 60000)
+  @UseGuards(RateLimitGuard)
+  startTest() {
+    return 'hello appu';
   }
 }

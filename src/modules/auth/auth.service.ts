@@ -123,6 +123,7 @@ export class AuthService {
     return this.issueToken(user.id);
   }
 
+  
   async getMe(userId: string) {
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
