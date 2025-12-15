@@ -1,3 +1,8 @@
+// ============================================
+// OPTIMIZED SCHEMA: Meal with Embedded Ingredients
+// This is a denormalized approach for BLAZING FAST searches
+// ============================================
+
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
@@ -5,13 +10,17 @@ generator client {
 
 datasource db {
   provider   = "postgresql"
-  extensions = [vector()]
+  extensions = [pg_trgm]
 }
 
 enum UserRole {
   ADMIN
   USER
 }
+
+// ============================================
+// USER MODELS (No Change)
+// ============================================
 
 model User {
   id           String  @id @default(uuid())
@@ -24,9 +33,8 @@ model User {
   stateCode String?
   regionId  String?
 
-  tokenSet TokenSet?
-  sessions UserSession[]
-
+  tokenSet       TokenSet?
+  sessions       UserSession[]
   dietaryProfile UserDietProfile?
 
   createdAt DateTime @default(now())
@@ -37,7 +45,7 @@ model User {
 model TokenSet {
   userId      String   @id
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  refershHash String?
+  refreshHash String?
   updatedAt   DateTime @updatedAt
 }
 
@@ -50,6 +58,9 @@ model UserSession {
   userAgent    String?
   lastActivity DateTime @default(now())
   createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([lastActivity])
 }
 
 model UserDietProfile {
@@ -65,6 +76,10 @@ model UserDietProfile {
 
   updatedAt DateTime @updatedAt
 }
+
+// ============================================
+// INGREDIENT MODELS (Keep for management)
+// ============================================
 
 model IngredientCategory {
   id          String       @id @default(uuid())
@@ -92,6 +107,9 @@ model Ingredient {
   tags String[] @default([])
 
   recipes RecipeIngredient[]
+
+  @@index([name])
+  @@index([categoryId])
 }
 
 model MealCategory {
@@ -99,7 +117,12 @@ model MealCategory {
   name        String   @unique
   description String?
   recipes     Recipe[]
+  meals       Meal[] // New relation
 }
+
+// ============================================
+// OLD RECIPE MODEL (Keep for detailed view)
+// ============================================
 
 model Recipe {
   id String @id @default(uuid())
@@ -107,13 +130,12 @@ model Recipe {
   title            String
   slug             String  @unique
   shortDescription String?
-  instructions     String // full recipe steps
+  instructions     String
   imageUrl         String?
 
   cookingTimeMinutes Int?
   difficulty         RecipeDifficulty @default(EASY)
 
-  // Relations
   regionId String?
   region   Region? @relation("RecipeRegion", fields: [regionId], references: [id])
 
@@ -122,7 +144,6 @@ model Recipe {
 
   ingredients RecipeIngredient[]
 
-  // Dietary flags (computed from ingredients)
   isVeg            Boolean @default(false)
   isVegan          Boolean @default(false)
   dairyFree        Boolean @default(true)
@@ -130,12 +151,13 @@ model Recipe {
   glutenFree       Boolean @default(true)
   diabetesFriendly Boolean @default(false)
 
-  // Search optimizations
-  searchVector Unsupported("tsvector")?
-  embedding    Unsupported("vector(768)")?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([mealCategoryId])
+  @@index([regionId])
+  @@index([isVeg, isVegan, dairyFree, nutFree, glutenFree, diabetesFriendly])
+  @@index([slug])
 }
 
 enum RecipeDifficulty {
@@ -148,7 +170,7 @@ model RecipeIngredient {
   id String @id @default(uuid())
 
   recipeId String
-  recipe   Recipe @relation(fields: [recipeId], references: [id])
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   ingredientId String
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
@@ -156,7 +178,70 @@ model RecipeIngredient {
   quantity   Float?
   unit       String?
   isOptional Boolean @default(false)
+
+  @@index([recipeId])
+  @@index([ingredientId])
 }
+
+// ============================================
+// NEW OPTIMIZED MEAL MODEL
+// Denormalized for SUPER FAST searches
+// ============================================
+
+model Meal {
+  id String @id @default(uuid())
+
+  title            String
+  slug             String  @unique
+  shortDescription String?
+  instructions     String
+  imageUrl         String?
+
+  cookingTimeMinutes Int?
+  difficulty         RecipeDifficulty @default(EASY)
+
+  // Relations
+  regionId String?
+  region   Region? @relation("MealRegion", fields: [regionId], references: [id])
+
+  mealCategoryId String?
+  mealCategory   MealCategory? @relation(fields: [mealCategoryId], references: [id])
+
+
+  ingredientIds   String[] 
+  ingredientNames String[] 
+  ingredientSlugs String[] 
+
+  // Dietary flags (precomputed)
+  isVeg            Boolean @default(false)
+  isVegan          Boolean @default(false)
+  dairyFree        Boolean @default(true)
+  nutFree          Boolean @default(true)
+  glutenFree       Boolean @default(true)
+  diabetesFriendly Boolean @default(false)
+
+  
+  searchText String? // Precomputed: "title + description + ingredients"
+
+  // Stats (can be updated periodically)
+  viewCount  Int @default(0)
+  clickCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 🔥 CRITICAL INDEXES for fast array searches
+  @@index([ingredientNames(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([mealCategoryId])
+  @@index([regionId])
+  @@index([isVeg, isVegan, dairyFree, nutFree, glutenFree, diabetesFriendly])
+  @@index([slug])
+  @@index([clickCount]) 
+}
+
+// ============================================
+// REGION MODEL 
+// ============================================
 
 model Region {
   id          String   @id @default(uuid())
@@ -170,4 +255,38 @@ model Region {
 
   users   User[]
   recipes Recipe[] @relation("RecipeRegion")
+  meals   Meal[]   @relation("MealRegion") // New relation
+
+  @@index([parentId])
+  @@index([countryCode])
 }
+
+
+// ============================================
+// SCHEMA STRATEGY EXPLANATION
+// ============================================
+
+/*
+WHY TWO MODELS (Recipe + Meal)?
+
+1. RECIPE MODEL:
+   - Normalized (proper relational design)
+   - Used for CRUD operations (create, update, delete)
+   - Used for detailed recipe view
+   - Maintains data integrity
+   - Easy to update ingredients
+
+2. MEAL MODEL:
+   - Denormalized (optimized for reads)
+   - Used for SEARCH operations only
+   - Precomputed/cached data
+   - BLAZING FAST queries (no JOINs!)
+   - Array operations on ingredients
+
+WORKFLOW:
+1. Admin creates/updates RECIPE (normalized)
+2. Trigger automatically syncs to MEAL (denormalized)
+3. User searches MEAL (super fast!)
+4. User clicks → show detailed RECIPE
+
+*/

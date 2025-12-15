@@ -6,6 +6,9 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './infra/database/prisma.module';
 import { SearchModule } from './modules/search/search.module';
 import { RedisModule } from './infra/cache/redis.module';
+import { RecipeModule } from './modules/recipe/recipe.module';
+import { MealsModule } from './modules/meals/meals.module';
+import { S3ImageUploadModule } from './modules/s3-image-uoload/s3-image-uoload.module';
 
 @Module({
   imports: [
@@ -15,7 +18,10 @@ import { RedisModule } from './infra/cache/redis.module';
     AuthModule,
     PrismaModule,
     RedisModule,
-    SearchModule
+    SearchModule,
+    RecipeModule,
+    MealsModule,
+    S3ImageUploadModule
   ],
   controllers: [AppController],
   providers: [AppService],

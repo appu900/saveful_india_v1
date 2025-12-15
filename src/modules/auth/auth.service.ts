@@ -28,26 +28,23 @@ export class AuthService {
 
   private async issueToken(userId: string) {
     const payload = { sub: userId };
-    
 
     const accessToken = await this.jwt.signAsync(payload, {
       secret: process.env.JWT_ACCESS_TOKEN_SECRET,
       expiresIn: '15m',
     });
 
-
     const refreshToken = await this.jwt.signAsync(payload, {
       secret: process.env.JWT_REFRESH_TOKEN_SECRET,
-      expiresIn: '7d', 
+      expiresIn: '7d',
     });
 
     const refreshHash = await this.hash(refreshToken);
 
-
     await this.prismaService.tokenSet.upsert({
       where: { userId },
-      update: { refershHash: refreshHash },
-      create: { userId, refershHash: refreshHash },
+      update: { refreshHash: refreshHash },
+      create: { userId,   refreshHash: refreshHash },
     });
 
     return { accessToken, refreshToken };
@@ -123,7 +120,6 @@ export class AuthService {
     return this.issueToken(user.id);
   }
 
-  
   async getMe(userId: string) {
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
@@ -139,7 +135,7 @@ export class AuthService {
     return user;
   }
 
-async refresh(refreshToken: string) {
+  async refresh(refreshToken: string) {
     try {
       // Verify and decode the refresh token to get userId
       const payload = await this.jwt.verifyAsync(refreshToken, {
@@ -153,12 +149,12 @@ async refresh(refreshToken: string) {
         where: { userId },
       });
 
-      if (!tokenSet || !tokenSet.refershHash) {
+      if (!tokenSet || !tokenSet.refreshHash) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
       // Verify the refresh token matches the stored hash
-      const valid = await this.compareHash(refreshToken, tokenSet.refershHash);
+      const valid = await this.compareHash(refreshToken, tokenSet.refreshHash);
       if (!valid) {
         throw new UnauthorizedException('Invalid refresh token');
       }
