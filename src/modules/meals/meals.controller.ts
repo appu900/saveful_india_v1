@@ -15,12 +15,15 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MealsService } from './meals.service';
 import { RateLimit } from '../../common/guards/rate-limit.guard';
 import { CreateMealDto, UpdateMealDto } from './dto/meals.dto';
-
+import { GetUser } from '../../common/decorators/get-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt.auth.guard';
 
 @Controller('meals')
 export class MealsController {
@@ -35,6 +38,7 @@ export class MealsController {
   @RateLimit(20, 60000)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('image'))
+  @UseGuards(JwtAuthGuard)
   async createMeal(
     @Body() createMealDto: CreateMealDto,
     @UploadedFile(
@@ -47,9 +51,9 @@ export class MealsController {
       }),
     )
     image: Express.Multer.File,
-    @Request() req,
+    @GetUser() user: any,
   ) {
-    return this.mealService.createMeal(createMealDto, req.user.id, image);
+    return this.mealService.createMeal(createMealDto, user.userId, image);
   }
 
   /**
@@ -60,6 +64,7 @@ export class MealsController {
   @Put(':id')
   @RateLimit(30, 60000)
   @UseInterceptors(FileInterceptor('image'))
+  @UseGuards(JwtAuthGuard)
   async updateMeal(
     @Param('id') mealId: string,
     @Body() updateMealDto: UpdateMealDto,
@@ -73,12 +78,12 @@ export class MealsController {
       }),
     )
     image: Express.Multer.File,
-    @Request() req,
+    @GetUser() user: any,
   ) {
     return this.mealService.updateMeal(
       mealId,
       updateMealDto,
-      req.user.id,
+      user.userId,
       image,
     );
   }
@@ -90,8 +95,9 @@ export class MealsController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @RateLimit(10, 60000)
-  async deleteMeal(@Param('id') mealId: string, @Request() req) {
-    return this.mealService.deleteMeal(mealId, req.user.id);
+  @UseGuards(JwtAuthGuard)
+  async deleteMeal(@Param('id') mealId: string, @GetUser() user: any) {
+    return this.mealService.deleteMeal(mealId, user.userId);
   }
 
   /**
