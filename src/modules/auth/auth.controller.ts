@@ -13,6 +13,8 @@ import { LoginDto } from './dto/user.login.dto';
 import { RefreshTokenDto } from './dto/user.refreshToken.dto';
 import { JwtAuthGuard } from './guards/jwt.auth.guard';
 import { RateLimit, RateLimitGuard } from '../../common/guards/rate-limit.guard';
+import { ChefSignupDto } from './dto/chef-signup.dto';
+import { GetUser } from '../../common/decorators/get-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -22,6 +24,12 @@ export class AuthController {
   signup(@Body() dto: SignupDto) {
     return this.authService.signup(dto);
   }
+
+  @Post('/chef/signup')
+  createChef(@Body() dto:ChefSignupDto){
+    return this.authService.createChef(dto)
+  }
+
 
   @Post('login')
   @HttpCode(200)
@@ -42,8 +50,10 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  me(@Req() req: any) {
-    return this.authService.getMe(req.user.id);
+  me(@GetUser() user:any) {
+    const userId = user.userId
+    console.log(userId)
+    return this.authService.getMe(userId);
   }
 
   @Get('test')

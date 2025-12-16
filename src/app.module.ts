@@ -9,6 +9,7 @@ import { RedisModule } from './infra/cache/redis.module';
 import { RecipeModule } from './modules/recipe/recipe.module';
 import { MealsModule } from './modules/meals/meals.module';
 import { S3ImageUploadModule } from './modules/s3-image-uoload/s3-image-uoload.module';
+import { IngrediantsModule } from './modules/ingrediants/ingrediants.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { S3ImageUploadModule } from './modules/s3-image-uoload/s3-image-uoload.m
     SearchModule,
     RecipeModule,
     MealsModule,
-    S3ImageUploadModule
+    S3ImageUploadModule,
+    IngrediantsModule
   ],
   controllers: [AppController],
   providers: [AppService],

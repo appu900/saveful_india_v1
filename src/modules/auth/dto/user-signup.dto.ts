@@ -6,6 +6,9 @@ export enum VegType {
   VEGAN = 'VEGAN',
 }
 
+
+
+
 export class SignupDto {
   @IsEmail()
   email: string;

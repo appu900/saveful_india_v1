@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { SignupDto } from './dto/user-signup.dto';
 import { v4 as uuid } from 'uuid';
 import { LoginDto } from './dto/user.login.dto';
+import { ChefSignupDto } from './dto/chef-signup.dto';
 
 @Injectable()
 export class AuthService {
@@ -26,8 +27,8 @@ export class AuthService {
     return bcrypt.compare(data, hash);
   }
 
-  private async issueToken(userId: string) {
-    const payload = { sub: userId };
+  private async issueToken(userId: string, role: string) {
+    const payload = { sub: userId, role };
 
     const accessToken = await this.jwt.signAsync(payload, {
       secret: process.env.JWT_ACCESS_TOKEN_SECRET,
@@ -44,7 +45,7 @@ export class AuthService {
     await this.prismaService.tokenSet.upsert({
       where: { userId },
       update: { refreshHash: refreshHash },
-      create: { userId,   refreshHash: refreshHash },
+      create: { userId, refreshHash: refreshHash },
     });
 
     return { accessToken, refreshToken };
@@ -93,7 +94,43 @@ export class AuthService {
         tokenSet: { create: {} },
       },
     });
-    return this.issueToken(user.id);
+    return this.issueToken(user.id,user.role);
+  }
+
+  async createChef(dto: ChefSignupDto) {
+    const exists = await this.prismaService.user.findUnique({
+      where: {
+        email: dto.email,
+      },
+    });
+    if (exists)
+      throw new ConflictException(
+        `User with email ${dto.email} already exists`,
+      );
+
+    if (dto.phoneNumber) {
+      const existingByPhone = await this.prismaService.user.findUnique({
+        where: {
+          phoneNumber: dto.phoneNumber,
+        },
+      });
+
+      if (existingByPhone) {
+        throw new BadRequestException('Phone number already exists');
+      }
+    }
+    const passwordHash = await this.hash(dto.password);
+    const user = await this.prismaService.user.create({
+      data: {
+        email: dto.email,
+        passwordHash,
+        phoneNumber: dto.phoneNumber,
+        name: dto.fullname,
+        role: 'CHEF',
+        tokenSet: { create: {} },
+      },
+    });
+    return this.issueToken(user.id, user.role);
   }
 
   async login(
@@ -117,7 +154,7 @@ export class AuthService {
         userAgent: deviceInfo?.userAgent,
       },
     });
-    return this.issueToken(user.id);
+    return this.issueToken(user.id, user.role);
   }
 
   async getMe(userId: string) {
@@ -143,6 +180,7 @@ export class AuthService {
       });
 
       const userId = payload.sub;
+      const role = payload.role;
 
       // Get the stored token hash from database
       const tokenSet = await this.prismaService.tokenSet.findUnique({
@@ -160,7 +198,7 @@ export class AuthService {
       }
 
       // Issue new tokens
-      return this.issueToken(userId);
+      return this.issueToken(userId, role);
     } catch (error) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }

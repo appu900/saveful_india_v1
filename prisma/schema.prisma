@@ -1,8 +1,3 @@
-// ============================================
-// OPTIMIZED SCHEMA: Meal with Embedded Ingredients
-// This is a denormalized approach for BLAZING FAST searches
-// ============================================
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
@@ -16,10 +11,36 @@ datasource db {
 enum UserRole {
   ADMIN
   USER
+  CHEF
+}
+
+enum RecipeDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Season {
+  SPRING
+  SUMMER
+  FALL
+  WINTER
+  ALL_SEASON
+}
+
+enum IngredientType {
+  VEGETABLE
+  FRUIT
+  GRAIN
+  PROTEIN
+  DAIRY
+  SPICE
+  OIL
+  OTHER
 }
 
 // ============================================
-// USER MODELS (No Change)
+// USER MODELS
 // ============================================
 
 model User {
@@ -36,6 +57,10 @@ model User {
   tokenSet       TokenSet?
   sessions       UserSession[]
   dietaryProfile UserDietProfile?
+  
+  // New: User interactions
+  cookedMeals    CookedMeal[]
+  bookmarkedMeals BookmarkedMeal[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -65,7 +90,7 @@ model UserSession {
 
 model UserDietProfile {
   userId String @id
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   vegType        String
   dairyFree      Boolean  @default(false)
@@ -78,12 +103,51 @@ model UserDietProfile {
 }
 
 // ============================================
-// INGREDIENT MODELS (Keep for management)
+// NEW: USER MEAL INTERACTIONS
+// ============================================
+
+model CookedMeal {
+  id String @id @default(uuid())
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  mealId String
+  meal   Meal   @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  
+  cookedAt DateTime @default(now())
+  rating   Int?     @default(0) // 1-5 stars
+  notes    String?  // User's cooking notes
+  
+  @@unique([userId, mealId, cookedAt])
+  @@index([userId])
+  @@index([mealId])
+  @@index([cookedAt])
+}
+
+model BookmarkedMeal {
+  id String @id @default(uuid())
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  mealId String
+  meal   Meal   @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, mealId])
+  @@index([userId])
+  @@index([mealId])
+}
+
+// ============================================
+// UPDATED INGREDIENT MODELS WITH NEW FIELDS
 // ============================================
 
 model IngredientCategory {
   id          String       @id @default(uuid())
-  name        String
+  name        String       @unique
   description String
   ingredients Ingredient[]
 }
@@ -94,22 +158,45 @@ model Ingredient {
   slug    String   @unique
   aliases String[] @default([])
 
+  // NEW: Image and descriptions
+  imageUrl         String? // S3 URL for ingredient image
+  description      String? // General description
+  nutritionInfo    String? // Nutritional information (JSON string or text)
+  
+  // NEW: Type and Season
+  type             IngredientType @default(OTHER)
+  isVegetable      Boolean        @default(false)
+  isFruit          Boolean        @default(false)
+  availableSeasons Season[]       @default([ALL_SEASON]) // When ingredient is in season
+
   categoryId String?
   category   IngredientCategory? @relation(fields: [categoryId], references: [id])
 
+  // Dietary properties
   isVeg   Boolean @default(true)
   isVegan Boolean @default(true)
-
   isDairy  Boolean @default(false)
   isNut    Boolean @default(false)
   isGluten Boolean @default(false)
 
   tags String[] @default([])
+  
+  // NEW: Who added this ingredient
+  addedBy     UserRole @default(ADMIN) // ADMIN or CHEF
+  isVerified  Boolean  @default(false) // Admin verification flag
 
   recipes RecipeIngredient[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([name])
+  @@index([slug])
   @@index([categoryId])
+  @@index([type])
+  @@index([isVegetable, isFruit])
+  @@index([availableSeasons])
+  @@index([isVerified])
 }
 
 model MealCategory {
@@ -117,11 +204,11 @@ model MealCategory {
   name        String   @unique
   description String?
   recipes     Recipe[]
-  meals       Meal[] // New relation
+  meals       Meal[]
 }
 
 // ============================================
-// OLD RECIPE MODEL (Keep for detailed view)
+// RECIPE MODEL (Keep for reference)
 // ============================================
 
 model Recipe {
@@ -160,12 +247,6 @@ model Recipe {
   @@index([slug])
 }
 
-enum RecipeDifficulty {
-  EASY
-  MEDIUM
-  HARD
-}
-
 model RecipeIngredient {
   id String @id @default(uuid())
 
@@ -184,8 +265,7 @@ model RecipeIngredient {
 }
 
 // ============================================
-// NEW OPTIMIZED MEAL MODEL
-// Denormalized for SUPER FAST searches
+// OPTIMIZED MEAL MODEL FOR FAST SEARCH
 // ============================================
 
 model Meal {
@@ -207,10 +287,10 @@ model Meal {
   mealCategoryId String?
   mealCategory   MealCategory? @relation(fields: [mealCategoryId], references: [id])
 
-
-  ingredientIds   String[] 
-  ingredientNames String[] 
-  ingredientSlugs String[] 
+  // 🚀 DENORMALIZED: Embedded ingredient data for fast search
+  ingredientIds   String[] @default([])
+  ingredientNames String[] @default([])
+  ingredientSlugs String[] @default([])
 
   // Dietary flags (precomputed)
   isVeg            Boolean @default(false)
@@ -220,27 +300,31 @@ model Meal {
   glutenFree       Boolean @default(true)
   diabetesFriendly Boolean @default(false)
 
-  
-  searchText String? // Precomputed: "title + description + ingredients"
+  // Search optimization
+  searchText String?
 
-  // Stats (can be updated periodically)
+  // Stats
   viewCount  Int @default(0)
   clickCount Int @default(0)
+  
+  // NEW: User interactions
+  cookedByUsers    CookedMeal[]
+  bookmarkedByUsers BookmarkedMeal[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // 🔥 CRITICAL INDEXES for fast array searches
-  @@index([ingredientNames(ops: raw("gin_trgm_ops"))], type: Gin)
+  // 🔥 FIXED INDEXES - Separate for arrays and text
   @@index([mealCategoryId])
   @@index([regionId])
   @@index([isVeg, isVegan, dairyFree, nutFree, glutenFree, diabetesFriendly])
   @@index([slug])
-  @@index([clickCount]) 
+  @@index([clickCount])
+  @@index([createdAt])
 }
 
 // ============================================
-// REGION MODEL 
+// REGION MODEL
 // ============================================
 
 model Region {
@@ -255,7 +339,7 @@ model Region {
 
   users   User[]
   recipes Recipe[] @relation("RecipeRegion")
-  meals   Meal[]   @relation("MealRegion") // New relation
+  meals   Meal[]   @relation("MealRegion")
 
   @@index([parentId])
   @@index([countryCode])
@@ -263,30 +347,32 @@ model Region {
 
 
 // ============================================
-// SCHEMA STRATEGY EXPLANATION    ----- for the future developres from the og developers
+// POST-MIGRATION SQL - Run this AFTER migration
+// Save this as: prisma/migrations/post-migrate.sql
 // ============================================
 
 /*
-WHY TWO MODELS (Recipe + Meal)?
+-- Enable pg_trgm extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-1. RECIPE MODEL:
-   - Normalized (proper relational design)
-   - Used for CRUD operations (create, update, delete)
-   - Used for detailed recipe view
-   - Maintains data integrity
-   - Easy to update ingredients
+-- Create GIN index for ingredient names array (for overlap searches)
+-- This uses default array operators, NOT gin_trgm_ops
+CREATE INDEX IF NOT EXISTS "Meal_ingredientNames_array_idx" 
+  ON "Meal" USING GIN ("ingredientNames");
 
-2. MEAL MODEL:
-   - Denormalized (optimized for reads)
-   - Used for SEARCH operations only
-   - Precomputed/cached data
-   - BLAZING FAST queries (no JOINs!)
-   - Array operations on ingredients
+-- Create GIN index for searchText with trigram (for text search)
+CREATE INDEX IF NOT EXISTS "Meal_searchText_trgm_idx" 
+  ON "Meal" USING GIN ("searchText" gin_trgm_ops);
 
-WORKFLOW:
-1. Admin creates/updates RECIPE (normalized)
-2. Trigger automatically syncs to MEAL (denormalized)
-3. User searches MEAL (super fast!)
-4. User clicks → show detailed RECIPE
+-- Create GIN index for ingredient names with trigram (for fuzzy matching individual names)
+CREATE INDEX IF NOT EXISTS "Ingredient_name_trgm_idx" 
+  ON "Ingredient" USING GIN ("name" gin_trgm_ops);
 
+-- Create GIN index for ingredient aliases array
+CREATE INDEX IF NOT EXISTS "Ingredient_aliases_array_idx" 
+  ON "Ingredient" USING GIN ("aliases");
+
+-- Create GIN index for ingredient seasons array
+CREATE INDEX IF NOT EXISTS "Ingredient_availableSeasons_array_idx" 
+  ON "Ingredient" USING GIN ("availableSeasons");
 */
