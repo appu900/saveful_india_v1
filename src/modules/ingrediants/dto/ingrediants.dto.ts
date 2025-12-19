@@ -1,193 +1,134 @@
-import { IsString, IsOptional, IsBoolean, IsArray, IsNumber, Min, Max, IsIn, IsEnum } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IngredientType, Season } from "@prisma/client";
-
-const allowedSeasons = ['SPRING', 'SUMMER', 'FALL', 'WINTER', 'ALL_SEASON'] as const;
-type AllowedSeasons = typeof allowedSeasons[number];
+// src/ingredients/dto/ingredient.dto.ts
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsBoolean,
+  IsObject,
+  ValidateIf,
+  Min,
+  Max,
+  IsInt,
+  IsUrl,
+} from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { IngredientType, Season, UserRole } from '@prisma/client';
 
 export class CreateIngredientDto {
-  @ApiProperty({ description: 'Name of the ingredient', example: 'Tomato' })
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({ description: 'Alternative names for the ingredient', type: [String], example: ['Cherry tomato'] })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      try {
-        // Try parsing as JSON first
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed : [value];
-      } catch {
-        // If not JSON, split by comma
-        return value.split(',').map((item) => item.trim()).filter(Boolean);
-      }
-    }
-    return Array.isArray(value) ? value : [];
-  })
   @IsArray()
   @IsString({ each: true })
+  @Transform(({ value }) => value ? (Array.isArray(value) ? value : typeof value === 'string' ? JSON.parse(value) : []) : [])
   aliases?: string[];
 
-  @ApiPropertyOptional({ description: 'Description of the ingredient', example: 'A red fruit used in salads' })
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  imageUrl?: string;
+
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Nutritional information', example: 'High in Vitamin C' })
   @IsOptional()
-  @IsString()
-  nutritionInfo?: string;
+  @IsObject()
+  @Type(() => Object)
+  @Transform(({ value }) => value ? (typeof value === 'string' ? JSON.parse(value) : value) : undefined)
+  nutritionInfo?: any;
 
-  @ApiPropertyOptional({ description: 'Type of ingredient', enum: IngredientType, example: IngredientType.VEGETABLE })
   @IsOptional()
   @IsEnum(IngredientType)
   type?: IngredientType;
 
-  @ApiPropertyOptional({ description: 'Whether it is a vegetable', example: true })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true';
-    }
-    return Boolean(value);
-  })
-  @IsBoolean()
-  isVegetable?: boolean;
-
-  @ApiPropertyOptional({ description: 'Whether it is a fruit', example: false })
-  @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true';
-    }
-    return Boolean(value);
-  })
-  @IsBoolean()
-  isFruit?: boolean;
-
-  @ApiPropertyOptional({ description: 'Available seasons', type: [String], example: ['SPRING', 'SUMMER'] })
-  @IsOptional()
-  @Transform(({ value }) => {
-    let arr = value;
-    
-    // Handle string input (from form-data)
-    if (typeof value === 'string') {
-      try {
-        // Try parsing as JSON array first
-        const parsed = JSON.parse(value);
-        arr = Array.isArray(parsed) ? parsed : [value];
-      } catch {
-        // If not JSON, split by comma
-        arr = value.split(',').map((item) => item.trim()).filter(Boolean);
-      }
-    } else if (!Array.isArray(value)) {
-      arr = [];
-    }
-    
-    // Convert all values to uppercase
-    return arr.map((item) => (typeof item === 'string' ? item.toUpperCase() : item));
-  })
   @IsArray()
-  @IsIn(allowedSeasons, { 
-    each: true, 
-    message: `Each value in availableSeasons must be one of: ${allowedSeasons.join(', ')}` 
-  })
-  availableSeasons?: AllowedSeasons[];
+  @IsEnum(Season, { each: true })
+  @Transform(({ value }) => value ? (Array.isArray(value) ? value : typeof value === 'string' ? JSON.parse(value) : []) : [])
+  availableSeasons?: Season[];
 
-  @ApiPropertyOptional({ description: 'Category ID', example: 'cat_123' })
   @IsOptional()
   @IsString()
   categoryId?: string;
 
-  @ApiPropertyOptional({ description: 'Vegetarian friendly', example: true })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true';
-    }
-    return Boolean(value);
-  })
   @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   isVeg?: boolean;
 
-  @ApiPropertyOptional({ description: 'Vegan friendly', example: true })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true';
-    }
-    return Boolean(value);
-  })
   @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   isVegan?: boolean;
 
-  @ApiPropertyOptional({ description: 'Contains dairy', example: false })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true';
-    }
-    return Boolean(value);
-  })
   @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   isDairy?: boolean;
 
-  @ApiPropertyOptional({ description: 'Contains nuts', example: false })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true';
-    }
-    return Boolean(value);
-  })
   @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   isNut?: boolean;
 
-  @ApiPropertyOptional({ description: 'Contains gluten', example: false })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true';
-    }
-    return Boolean(value);
-  })
   @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   isGluten?: boolean;
 
-  @ApiPropertyOptional({ description: 'Tags for the ingredient', type: [String], example: ['organic', 'fresh'] })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      try {
-        // Try parsing as JSON first
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed : [value];
-      } catch {
-        // If not JSON, split by comma
-        return value.split(',').map((item) => item.trim()).filter(Boolean);
-      }
-    }
-    return Array.isArray(value) ? value : [];
-  })
   @IsArray()
   @IsString({ each: true })
+  @Transform(({ value }) => value ? (Array.isArray(value) ? value : typeof value === 'string' ? JSON.parse(value) : []) : [])
   tags?: string[];
+
+  @IsOptional()
+  @IsEnum(UserRole)
+  addedBy?: UserRole;
 }
 
-// User Interaction DTOs
-export class CookMealDto {
-  @ApiPropertyOptional({ description: 'Rating from 1 to 5', minimum: 1, maximum: 5, example: 4 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(5)
-  rating?: number;
+export class UpdateIngredientDto extends CreateIngredientDto {
+  @IsString()
+  id: string;
+}
 
-  @ApiPropertyOptional({ description: 'User notes about cooking the meal', example: 'Added extra spices' })
+export class SearchIngredientsDto {
   @IsOptional()
   @IsString()
-  notes?: string;
+  query?: string;
+
+  @IsOptional()
+  @IsEnum(IngredientType)
+  type?: IngredientType;
+
+  @IsOptional()
+  @IsEnum(Season)
+  season?: Season;
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true')
+  isVeg?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true')
+  isVegan?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  offset?: number;
 }

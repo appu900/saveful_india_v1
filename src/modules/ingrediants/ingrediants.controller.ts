@@ -11,56 +11,69 @@ import {
   Query,
   DefaultValuePipe,
   ParseIntPipe,
+  Delete,
+  BadRequestException,
 } from '@nestjs/common';
 import { IngrediantsService } from './ingrediants.service';
 import { JwtAuthGuard } from '../auth/guards/jwt.auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { CreateIngredientDto } from './dto/ingrediants.dto';
+import {
+  CreateIngredientDto,
+  SearchIngredientsDto,
+} from './dto/ingrediants.dto';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import { Season } from '@prisma/client';
-import { UpdateIngredientDto } from '../meals/dto/meals.dto';
 import { createIngrediantCategoryDto } from './dto/ingrediants.category.dto';
+import { S3ImageUploadService } from '../s3-image-uoload/s3-image-uoload.service';
 
 @Controller('ingrediants')
 export class IngrediantsController {
-  constructor(private readonly ingredientsService: IngrediantsService) {}
+  constructor(
+    private readonly ingredientsService: IngrediantsService,
+    private readonly s3Serice: S3ImageUploadService,
+  ) {}
 
-  @Post('admin')
+  @Post('/category')
+  async createCategory(@Body() dto: createIngrediantCategoryDto) {
+    return this.ingredientsService.createIngrediantsCategory(dto);
+  }
+  @Get('/category')
+  async fetchCategory() {
+    return this.ingredientsService.fetchAllIngrediantsCategory();
+  }
+
+  @Post('')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'CHEF')
   @UseInterceptors(FileInterceptor('image'))
   async createIngredient(
-    @Body() createIngredientDto: CreateIngredientDto,
+    @Body() dto: CreateIngredientDto,
     @UploadedFile() image: Express.Multer.File,
     @GetUser() user: any,
   ) {
-    return this.ingredientsService.createIngredient(
-      createIngredientDto,
-      image,
-      user.userId,
-    );
+    let imageUrl = '';
+    if (image) {
+      imageUrl = await this.s3Serice.uploadIngredientImage(image);
+    }
+    dto.imageUrl = imageUrl;
+    return this.ingredientsService.createIngredient(dto);
   }
 
-  /**
-   * Chef adds ingredient (needs verification)
-   * POST /ingredients/chef
-   */
-  @Post('chef')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('CHEF')
-  @UseInterceptors(FileInterceptor('image'))
-  async chefAddIngredient(
-    @Body() createIngredientDto: CreateIngredientDto,
-    @UploadedFile() image: Express.Multer.File,
-    @GetUser() user: any,
-  ) {
-    return this.ingredientsService.chefAddIngredient(
-      createIngredientDto,
-      image,
-      user.userId,
-    );
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.ingredientsService.getIngredientById(id);
+  }
+
+  @Get('slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.ingredientsService.getIngredientBySlug(slug);
+  }
+
+  @Get()
+  search(@Query() searchIngredientsDto: SearchIngredientsDto) {
+    return this.ingredientsService.searchIngredients(searchIngredientsDto);
   }
 
   /**
@@ -69,36 +82,21 @@ export class IngrediantsController {
    */
   @Get('season/:season')
   async getIngredientsBySeason(
-    @Param('season') season: Season,
+    @Param('season') seasonParam: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ) {
+    const season = Season[seasonParam.toUpperCase() as keyof typeof Season];
+    console.log(season);
     return this.ingredientsService.getIngredientsBySeason(season, limit);
   }
 
-  /**
-   * Get current season's ingredients
-   * GET /ingredients/season/current?limit=50
-   */
-  @Get('season/current')
-  async getCurrentSeasonIngredients(
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
-  ) {
-    return this.ingredientsService.getCurrentSeasonIngredients(limit);
-  }
-
-  /**
-   * Search ingredients
-   * GET /ingredients/search?query=tomato&limit=20
-   */
-  @Get('search')
-  async searchIngredients(
-    @Query('query') query: string,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-  ) {
-    if (!query) {
-      return { message: 'Query parameter is required', ingredients: [] };
+  @Get('filter/:categoryId')
+  async fetchIngrediantsById(@Param('categoryId') categoryId: string) {
+    if (!categoryId) {
+      throw new BadRequestException('Bad request');
     }
-    return this.ingredientsService.searchIngredients(query, limit);
+    return this.ingredientsService.getIngredientByCategory(categoryId)
+
   }
 
   /**
@@ -123,52 +121,18 @@ export class IngrediantsController {
     return this.ingredientsService.getFruits(limit);
   }
 
-  /**
-   * Admin verifies chef-added ingredient
-   * PATCH /ingredients/:id/verify
-   */
   @Patch(':id/verify')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  async verifyIngredient(@Param('id') id: string, @GetUser() user: any) {
-    return this.ingredientsService.verifyIngredient(id, user.userId);
+  verify(@Param('id') id: string) {
+    return this.ingredientsService.verifyIngredient(id);
   }
 
-  /**
-   * Update ingredient with optional new image
-   * PATCH /ingredients/:id
-   */
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  @UseInterceptors(FileInterceptor('image'))
-  async updateIngredient(
-    @Param('id') id: string,
-    @Body() updateIngredientDto: UpdateIngredientDto,
-    @UploadedFile() image: Express.Multer.File,
-  ) {
-    return this.ingredientsService.updateIngredient(
-      id,
-      updateIngredientDto,
-      image,
-    );
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.ingredientsService.deleteIngredient(id);
   }
 
-  /**
-   *
-   * create ingredinats category
-   * will be added only by admin
-   */
-
-//   @UseGuards(JwtAuthGuard, RolesGuard)
-//   @Roles('ADMIN')
-  @Post('/category')
-  async createCategory(@Body() dto: createIngrediantCategoryDto) {
-    return this.ingredientsService.createIngrediantsCategory(dto);
-  }
-
-  @Get('/category')
-  async fetchCategory(@Body() dto: createIngrediantCategoryDto) {
-    return this.ingredientsService.fetchAllIngrediantsCategory();
+  @Get('')
+  async fetchAllIngrediants() {
+    return this.ingredientsService.fetchAllIngrediants();
   }
 }

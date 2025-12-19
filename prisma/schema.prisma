@@ -20,6 +20,18 @@ enum RecipeDifficulty {
   HARD
 }
 
+enum RecipeType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+  DESSERT
+  BEVERAGE
+  APPETIZER
+  MAIN_COURSE
+  SIDE_DISH
+}
+
 enum Season {
   SPRING
   SUMMER
@@ -36,6 +48,10 @@ enum IngredientType {
   DAIRY
   SPICE
   OIL
+  CONDIMENT
+  HERB
+  NUT
+  SEED
   OTHER
 }
 
@@ -49,18 +65,15 @@ model User {
   passwordHash String
   phoneNumber  String? @unique
   name         String
+  role         UserRole @default(USER)
+  stateCode    String?
+  regionId     String?
 
-  role      UserRole @default(USER)
-  stateCode String?
-  regionId  String?
-
-  tokenSet       TokenSet?
-  sessions       UserSession[]
-  dietaryProfile UserDietProfile?
-  
-  // New: User interactions
-  cookedMeals    CookedMeal[]
-  bookmarkedMeals BookmarkedMeal[]
+  tokenSet         TokenSet?
+  sessions         UserSession[]
+  dietaryProfile   UserDietProfile?
+  cookedRecipes    CookedRecipe[]
+  bookmarkedRecipes BookmarkedRecipe[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -103,224 +116,212 @@ model UserDietProfile {
 }
 
 // ============================================
-// NEW: USER MEAL INTERACTIONS
+// USER RECIPE INTERACTIONS
 // ============================================
 
-model CookedMeal {
+model CookedRecipe {
   id String @id @default(uuid())
   
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  mealId String
-  meal   Meal   @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   
   cookedAt DateTime @default(now())
-  rating   Int?     @default(0) // 1-5 stars
+  rating   Int?     // 1-5 stars
   notes    String?  // User's cooking notes
   
-  @@unique([userId, mealId, cookedAt])
+  @@unique([userId, recipeId, cookedAt])
   @@index([userId])
-  @@index([mealId])
+  @@index([recipeId])
   @@index([cookedAt])
 }
 
-model BookmarkedMeal {
+model BookmarkedRecipe {
   id String @id @default(uuid())
   
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  mealId String
-  meal   Meal   @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   
   createdAt DateTime @default(now())
   
-  @@unique([userId, mealId])
+  @@unique([userId, recipeId])
   @@index([userId])
-  @@index([mealId])
+  @@index([recipeId])
 }
 
 // ============================================
-// UPDATED INGREDIENT MODELS WITH NEW FIELDS
+// INGREDIENT MODELS
 // ============================================
 
 model IngredientCategory {
   id          String       @id @default(uuid())
   name        String       @unique
-  description String
+  description String?
+  sortOrder   Int          @default(0)
   ingredients Ingredient[]
-}
-
-model Ingredient {
-  id      String   @id @default(uuid())
-  name    String   @unique
-  slug    String   @unique
-  aliases String[] @default([])
-
-  // NEW: Image and descriptions
-  imageUrl         String? // S3 URL for ingredient image
-  description      String? // General description
-  nutritionInfo    String? // Nutritional information (JSON string or text)
-  
-  // NEW: Type and Season
-  type             IngredientType @default(OTHER)
-  isVegetable      Boolean        @default(false)
-  isFruit          Boolean        @default(false)
-  availableSeasons Season[]       @default([ALL_SEASON]) // When ingredient is in season
-
-  categoryId String?
-  category   IngredientCategory? @relation(fields: [categoryId], references: [id])
-
-  // Dietary properties
-  isVeg   Boolean @default(true)
-  isVegan Boolean @default(true)
-  isDairy  Boolean @default(false)
-  isNut    Boolean @default(false)
-  isGluten Boolean @default(false)
-
-  tags String[] @default([])
-  
-  // NEW: Who added this ingredient
-  addedBy     UserRole @default(ADMIN) // ADMIN or CHEF
-  isVerified  Boolean  @default(false) // Admin verification flag
-
-  recipes RecipeIngredient[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@index([sortOrder])
+}
 
+model Ingredient {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  aliases     String[] @default([])
+  
+  imageUrl      String?
+  description   String?
+  nutritionInfo Json?   // Structured nutrition data
+  
+  type             IngredientType @default(OTHER)
+  availableSeasons Season[]       @default([ALL_SEASON])
+  
+  categoryId String?
+  category   IngredientCategory? @relation(fields: [categoryId], references: [id])
+  
+  // Dietary properties
+  isVeg    Boolean @default(true)
+  isVegan  Boolean @default(true)
+  isDairy  Boolean @default(false)
+  isNut    Boolean @default(false)
+  isGluten Boolean @default(false)
+  
+  tags String[] @default([])
+  
+  addedBy    UserRole @default(ADMIN)
+  isVerified Boolean  @default(false)
+  
+  recipeIngredients RecipeIngredient[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
   @@index([name])
   @@index([slug])
   @@index([categoryId])
   @@index([type])
-  @@index([isVegetable, isFruit])
-  @@index([availableSeasons])
   @@index([isVerified])
 }
 
-model MealCategory {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  recipes     Recipe[]
-  meals       Meal[]
-}
-
 // ============================================
-// RECIPE MODEL (Keep for reference)
+// RECIPE MODEL - MAIN
 // ============================================
 
 model Recipe {
-  id String @id @default(uuid())
-
-  title            String
-  slug             String  @unique
-  shortDescription String?
-  instructions     String
-  imageUrl         String?
-
-  cookingTimeMinutes Int?
-  difficulty         RecipeDifficulty @default(EASY)
-
+  id    String @id @default(uuid())
+  title String
+  slug  String @unique
+  
+  // About the dish
+  shortDescription String  // Brief description
+  longDescription  String  @db.Text // Full description
+  
+  // Hacks & Tips
+  hacksAndTips String[] @default([]) // Array of tips
+  
+  // Media
+  imageUrl    String?
+  youtubeUrl  String?
+  
+  // Recipe metadata
+  portions         String? // e.g., "4 servings", "2-3 people"
+  prepAndCookTime  String? // e.g., "~30min", "1 hour"
+  difficulty       RecipeDifficulty @default(EASY)
+  recipeType       RecipeType       @default(MAIN_COURSE)
+  
+  // Preparation instructions
+  prepShortDescription String?        // Brief prep note
+  prepLongDescription  String?  @db.Text // Detailed prep instructions
+  
+  // Cooking instructions
+  cookingInstructions String @db.Text
+  
+  // Relations
   regionId String?
-  region   Region? @relation("RecipeRegion", fields: [regionId], references: [id])
-
-  mealCategoryId String?
-  mealCategory   MealCategory? @relation(fields: [mealCategoryId], references: [id])
-
+  region   Region? @relation(fields: [regionId], references: [id])
+  
   ingredients RecipeIngredient[]
-
+  
+  // Dietary flags (computed from ingredients)
   isVeg            Boolean @default(false)
   isVegan          Boolean @default(false)
   dairyFree        Boolean @default(true)
   nutFree          Boolean @default(true)
   glutenFree       Boolean @default(true)
   diabetesFriendly Boolean @default(false)
-
+  
+  // 🚀 DENORMALIZED for fast search
+  ingredientIds    String[] @default([])
+  ingredientNames  String[] @default([])
+  ingredientSlugs  String[] @default([])
+  searchText       String?  // Combined searchable text
+  
+  // Stats
+  viewCount     Int @default(0)
+  cookCount     Int @default(0)
+  bookmarkCount Int @default(0)
+  avgRating     Float? @default(0)
+  
+  // User interactions
+  cookedByUsers     CookedRecipe[]
+  bookmarkedByUsers BookmarkedRecipe[]
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([mealCategoryId])
-  @@index([regionId])
-  @@index([isVeg, isVegan, dairyFree, nutFree, glutenFree, diabetesFriendly])
+  
   @@index([slug])
+  @@index([recipeType])
+  @@index([difficulty])
+  @@index([regionId])
+  @@index([isVeg, isVegan, dairyFree, nutFree, glutenFree])
+  @@index([cookCount])
+  @@index([avgRating])
+  @@index([createdAt])
 }
+
+// ============================================
+// RECIPE INGREDIENTS - JUNCTION TABLE
+// ============================================
 
 model RecipeIngredient {
   id String @id @default(uuid())
-
+  
   recipeId String
   recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-
+  
+  // Ingredient category for grouping
+  categoryName String? // e.g., "CRISPY RICE", "RED CURRY DRESSING", "VEGGIES"
+  sortOrder    Int     @default(0) // Order within recipe
+  
   ingredientId String
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
-
+  
+  // Instructions for this ingredient
+  instruction String? // e.g., "Aim for 2 cups" or "500gm"
+  
+  // Quantity details (optional, can be in instruction)
   quantity   Float?
   unit       String?
-  isOptional Boolean @default(false)
-
-  @@index([recipeId])
-  @@index([ingredientId])
-}
-
-// ============================================
-// OPTIMIZED MEAL MODEL FOR FAST SEARCH
-// ============================================
-
-model Meal {
-  id String @id @default(uuid())
-
-  title            String
-  slug             String  @unique
-  shortDescription String?
-  instructions     String
-  imageUrl         String?
-
-  cookingTimeMinutes Int?
-  difficulty         RecipeDifficulty @default(EASY)
-
-  // Relations
-  regionId String?
-  region   Region? @relation("MealRegion", fields: [regionId], references: [id])
-
-  mealCategoryId String?
-  mealCategory   MealCategory? @relation(fields: [mealCategoryId], references: [id])
-
-  // 🚀 DENORMALIZED: Embedded ingredient data for fast search
-  ingredientIds   String[] @default([])
-  ingredientNames String[] @default([])
-  ingredientSlugs String[] @default([])
-
-  // Dietary flags (precomputed)
-  isVeg            Boolean @default(false)
-  isVegan          Boolean @default(false)
-  dairyFree        Boolean @default(true)
-  nutFree          Boolean @default(true)
-  glutenFree       Boolean @default(true)
-  diabetesFriendly Boolean @default(false)
-
-  // Search optimization
-  searchText String?
-
-  // Stats
-  viewCount  Int @default(0)
-  clickCount Int @default(0)
   
-  // NEW: User interactions
-  cookedByUsers    CookedMeal[]
-  bookmarkedByUsers BookmarkedMeal[]
-
+  // Recommended alternatives
+  isRecommended Boolean  @default(true)
+  alternatives  String[] @default([]) // Alternative ingredient names
+  
+  isOptional Boolean @default(false)
+  
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // 🔥 FIXED INDEXES - Separate for arrays and text
-  @@index([mealCategoryId])
-  @@index([regionId])
-  @@index([isVeg, isVegan, dairyFree, nutFree, glutenFree, diabetesFriendly])
-  @@index([slug])
-  @@index([clickCount])
-  @@index([createdAt])
+  
+  @@index([recipeId, sortOrder])
+  @@index([ingredientId])
+  @@index([categoryName])
 }
 
 // ============================================
@@ -336,43 +337,44 @@ model Region {
   parentId    String?
   parent      Region?  @relation("RegionParent", fields: [parentId], references: [id])
   children    Region[] @relation("RegionParent")
-
+  
   users   User[]
-  recipes Recipe[] @relation("RecipeRegion")
-  meals   Meal[]   @relation("MealRegion")
-
+  recipes Recipe[]
+  
   @@index([parentId])
   @@index([countryCode])
 }
 
-
 // ============================================
-// POST-MIGRATION SQL - Run this AFTER migration
-// Save this as: prisma/migrations/post-migrate.sql
+// POST-MIGRATION SQL
+// Execute after running: npx prisma migrate dev
 // ============================================
 
 /*
--- Enable pg_trgm extension if not already enabled
+-- Enable pg_trgm extension
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- Create GIN index for ingredient names array (for overlap searches)
--- This uses default array operators, NOT gin_trgm_ops
-CREATE INDEX IF NOT EXISTS "Meal_ingredientNames_array_idx" 
-  ON "Meal" USING GIN ("ingredientNames");
+-- GIN index for ingredient names array (overlap searches)
+CREATE INDEX IF NOT EXISTS "Recipe_ingredientNames_array_idx" 
+  ON "Recipe" USING GIN ("ingredientNames");
 
--- Create GIN index for searchText with trigram (for text search)
-CREATE INDEX IF NOT EXISTS "Meal_searchText_trgm_idx" 
-  ON "Meal" USING GIN ("searchText" gin_trgm_ops);
+-- GIN index for searchText with trigram (fuzzy text search)
+CREATE INDEX IF NOT EXISTS "Recipe_searchText_trgm_idx" 
+  ON "Recipe" USING GIN ("searchText" gin_trgm_ops);
 
--- Create GIN index for ingredient names with trigram (for fuzzy matching individual names)
+-- GIN index for ingredient slugs array
+CREATE INDEX IF NOT EXISTS "Recipe_ingredientSlugs_array_idx" 
+  ON "Recipe" USING GIN ("ingredientSlugs");
+
+-- GIN index for hacks and tips array
+CREATE INDEX IF NOT EXISTS "Recipe_hacksAndTips_array_idx" 
+  ON "Recipe" USING GIN ("hacksAndTips");
+
+-- GIN index for ingredient name with trigram
 CREATE INDEX IF NOT EXISTS "Ingredient_name_trgm_idx" 
   ON "Ingredient" USING GIN ("name" gin_trgm_ops);
 
--- Create GIN index for ingredient aliases array
+-- GIN index for ingredient aliases
 CREATE INDEX IF NOT EXISTS "Ingredient_aliases_array_idx" 
   ON "Ingredient" USING GIN ("aliases");
-
--- Create GIN index for ingredient seasons array
-CREATE INDEX IF NOT EXISTS "Ingredient_availableSeasons_array_idx" 
-  ON "Ingredient" USING GIN ("availableSeasons");
 */
