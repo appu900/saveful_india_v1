@@ -12,9 +12,13 @@ import { SignupDto } from './dto/user-signup.dto';
 import { LoginDto } from './dto/user.login.dto';
 import { RefreshTokenDto } from './dto/user.refreshToken.dto';
 import { JwtAuthGuard } from './guards/jwt.auth.guard';
-import { RateLimit, RateLimitGuard } from '../../common/guards/rate-limit.guard';
+import {
+  RateLimit,
+  RateLimitGuard,
+} from '../../common/guards/rate-limit.guard';
 import { ChefSignupDto } from './dto/chef-signup.dto';
 import { GetUser } from '../../common/decorators/get-user.decorator';
+import { AdminSignupDto } from './dto/admin-signup.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -26,10 +30,14 @@ export class AuthController {
   }
 
   @Post('/chef/signup')
-  createChef(@Body() dto:ChefSignupDto){
-    return this.authService.createChef(dto)
+  createChef(@Body() dto: ChefSignupDto) {
+    return this.authService.createChef(dto);
   }
 
+  @Post('/admin/signup')
+  createAdmin(@Body() dto: AdminSignupDto) {
+    return this.authService.createAdmin(dto);
+  }
 
   @Post('login')
   @HttpCode(200)
@@ -50,9 +58,9 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  me(@GetUser() user:any) {
-    const userId = user.userId
-    console.log(userId)
+  me(@GetUser() user: any) {
+    const userId = user.userId;
+    console.log(userId);
     return this.authService.getMe(userId);
   }
 

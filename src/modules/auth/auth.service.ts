@@ -11,6 +11,7 @@ import { SignupDto } from './dto/user-signup.dto';
 import { v4 as uuid } from 'uuid';
 import { LoginDto } from './dto/user.login.dto';
 import { ChefSignupDto } from './dto/chef-signup.dto';
+import { AdminSignupDto } from './dto/admin-signup.dto';
 
 @Injectable()
 export class AuthService {
@@ -127,6 +128,44 @@ export class AuthService {
         phoneNumber: dto.phoneNumber,
         name: dto.fullname,
         role: 'CHEF',
+        tokenSet: { create: {} },
+      },
+    });
+    return this.issueToken(user.id, user.role);
+  }
+
+
+
+    async createAdmin(dto:AdminSignupDto) {
+    const exists = await this.prismaService.user.findUnique({
+      where: {
+        email: dto.email,
+      },
+    });
+    if (exists)
+      throw new ConflictException(
+        `User with email ${dto.email} already exists`,
+      );
+
+    if (dto.phoneNumber) {
+      const existingByPhone = await this.prismaService.user.findUnique({
+        where: {
+          phoneNumber: dto.phoneNumber,
+        },
+      });
+
+      if (existingByPhone) {
+        throw new BadRequestException('Phone number already exists');
+      }
+    }
+    const passwordHash = await this.hash(dto.password);
+    const user = await this.prismaService.user.create({
+      data: {
+        email: dto.email,
+        passwordHash,
+        phoneNumber: dto.phoneNumber,
+        name: dto.fullname,
+        role: 'ADMIN',
         tokenSet: { create: {} },
       },
     });
