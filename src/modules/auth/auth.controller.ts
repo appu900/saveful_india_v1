@@ -19,6 +19,9 @@ import {
 import { ChefSignupDto } from './dto/chef-signup.dto';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import { AdminSignupDto } from './dto/admin-signup.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -32,6 +35,20 @@ export class AuthController {
   @Post('/chef/signup')
   createChef(@Body() dto: ChefSignupDto) {
     return this.authService.createChef(dto);
+  }
+
+  @Get('/admins/all')
+  @Roles('ADMIN')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  fetchAllAdmins() {
+    return this.authService.fetchAllAdmins();
+  }
+
+  @Get('/chefs/all')
+  @Roles('ADMIN')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  fetchAllChefs() {
+    return this.authService.fetchAllChefs();
   }
 
   @Post('/admin/signup')

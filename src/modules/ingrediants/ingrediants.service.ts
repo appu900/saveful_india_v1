@@ -47,7 +47,7 @@ export class IngrediantsService {
         aliases: dto.aliases || [],
         imageUrl: dto.imageUrl,
         description: dto.description,
-        nutritionInfo: dto.nutritionInfo,
+        nutritionInfo: dto.nutritionInfo ?? 'no information available',
         type: dto.type || IngredientType.OTHER,
         availableSeasons: dto.availableSeasons || [Season.ALL_SEASON],
         categoryId: dto.categoryId,
@@ -56,9 +56,11 @@ export class IngrediantsService {
         isDairy: dto.isDairy ?? false,
         isNut: dto.isNut ?? false,
         isGluten: dto.isGluten ?? false,
+        isFruit: dto.isFruit ?? false,
+        isVegetable: dto.isVegetable ?? false,
         tags: dto.tags || [],
         addedBy: dto.addedBy || UserRole.ADMIN,
-        isVerified: dto.addedBy === UserRole.ADMIN,
+        isVerified:true,
       },
       include: {
         category: true,
@@ -81,16 +83,6 @@ export class IngrediantsService {
       include: {
         category: true,
         recipeIngredients: {
-          include: {
-            recipe: {
-              select: {
-                id: true,
-                title: true,
-                slug: true,
-                imageUrl: true,
-              },
-            },
-          },
           take: 10,
         },
       },
@@ -379,26 +371,25 @@ export class IngrediantsService {
   }
 
   async getIngredientByCategory(categoryId: string) {
-    const cacheKey = `ingredients_cat:${categoryId}data`;
-    const cached = await this.redis.get(cacheKey);
-    if (cached) return JSON.parse(cached);
+    // const cacheKey = `ingredients_cat:${categoryId}data`;
+    // const cached = await this.redis.get(cacheKey);
+    // if (cached) return JSON.parse(cached);
     const ingrediants = await this.prisma.ingredientCategory.findUnique({
       where: {
         id: categoryId,
       },
-      include:{
-        ingredients:{
-          select:{
-            name:true
-          }
-        }
-      }
+      include: {
+        ingredients: {
+          select: {
+            name: true,
+            id:true
+          },
+        },
+      },
     });
     // ** cached code for all nodes
-    await this.redis.setex(cacheKey, 3600, JSON.stringify(ingrediants))
-    return ingrediants
-
-
+    // await this.redis.setex(cacheKey, 3600, JSON.stringify(ingrediants));
+    return ingrediants;
   }
 
   /**

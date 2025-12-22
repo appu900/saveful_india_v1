@@ -46,7 +46,7 @@ export class IngrediantsController {
 
   @Post('')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'CHEF')
+  @Roles('ADMIN', 'CHEF')                                           
   @UseInterceptors(FileInterceptor('image'))
   async createIngredient(
     @Body() dto: CreateIngredientDto,
@@ -136,3 +136,22 @@ export class IngrediantsController {
     return this.ingredientsService.fetchAllIngrediants();
   }
 }
+
+
+
+
+/**
+ * 
+ * 
+ * chef ra profile admin create kariba ?
+ * 
+ * then seita autometically hei jiba access daba darkar nhi 
+ * 
+ * 
+ * admin 
+ *     fetch all chefs 
+ *     update and delete 
+ *     fetch other admins 
+ *     
+ * 
+ */

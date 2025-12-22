@@ -28,12 +28,34 @@ export class AuthService {
     return bcrypt.compare(data, hash);
   }
 
+  async fetchAllAdmins() {
+    return this.prismaService.user.findMany({
+      where: { role: 'ADMIN' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+  }
+
+   async fetchAllChefs() {
+    return this.prismaService.user.findMany({
+      where: { role: 'CHEF' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+  }
+
   private async issueToken(userId: string, role: string) {
     const payload = { sub: userId, role };
 
     const accessToken = await this.jwt.signAsync(payload, {
       secret: process.env.JWT_ACCESS_TOKEN_SECRET,
-      expiresIn: '45m',
+      expiresIn: '3d',
     });
 
     const refreshToken = await this.jwt.signAsync(payload, {
@@ -95,7 +117,7 @@ export class AuthService {
         tokenSet: { create: {} },
       },
     });
-    return this.issueToken(user.id,user.role);
+    return this.issueToken(user.id, user.role);
   }
 
   async createChef(dto: ChefSignupDto) {
@@ -134,9 +156,7 @@ export class AuthService {
     return this.issueToken(user.id, user.role);
   }
 
-
-
-    async createAdmin(dto:AdminSignupDto) {
+  async createAdmin(dto: AdminSignupDto) {
     const exists = await this.prismaService.user.findUnique({
       where: {
         email: dto.email,
