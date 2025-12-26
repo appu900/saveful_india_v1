@@ -89,6 +89,32 @@ export class S3ImageUploadService {
     }
   }
 
+
+    async uploadHackImage(file: Express.Multer.File): Promise<string> {
+    this.validateImage(file);
+
+    const fileExtension = file.originalname.split('.').pop();
+    const fileName = `Hacks/${uuidv4()}.${fileExtension}`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: fileName,
+        Body: file.buffer, // ⬅️ raw upload
+        ContentType: file.mimetype,
+        // ACL: 'public-read',
+        CacheControl: 'max-age=31536000',
+      });
+
+      await this.s3Client.send(command);
+
+      return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${fileName}`;
+    } catch (error) {
+      console.error('S3 upload error:', error);
+      throw new BadRequestException('Failed to upload image to S3');
+    }
+  }
+
   /* ===================== DELETE IMAGE ===================== */
 
   async deleteImage(imageUrl: string): Promise<void> {

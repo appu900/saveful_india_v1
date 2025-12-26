@@ -15,11 +15,11 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, 
-      forbidNonWhitelisted: true, 
-      transform: true, 
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
       transformOptions: {
-        enableImplicitConversion: true, 
+        enableImplicitConversion: true,
       },
     }),
   );
@@ -27,3 +27,5 @@ async function bootstrap() {
   console.log(`Application is running on: http://0.0.0.0:${process.env.PORT ?? 3000}`);
 }
 bootstrap();
+
+

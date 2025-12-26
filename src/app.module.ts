@@ -9,6 +9,7 @@ import { RecipeModule } from './modules/recipe/recipe.module';
 import { S3ImageUploadModule } from './modules/s3-image-uoload/s3-image-uoload.module';
 import { IngrediantsModule } from './modules/ingrediants/ingrediants.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { HackModule } from './modules/hack/hack.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AdminModule } from './modules/admin/admin.module';
     RecipeModule,
     S3ImageUploadModule,
     IngrediantsModule,
+    HackModule
   ],
   controllers: [AppController],
   providers: [AppService],
