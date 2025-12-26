@@ -108,12 +108,12 @@ export class AuthService {
         stateCode: dto.stateCode,
         dietaryProfile: {
           create: {
-            vegType: dto.vegType || 'OMNI',
-            dairyFree: dto.dairyFree || false,
-            nutFree: dto.nutFree || false,
-            glutenFree: dto.glutenFree || false,
-            hasDiabetes: dto.hasDiabetes || false,
-            otherAllergies: dto.otherAllergies || [],
+            vegType: dto.vegType ?? 'OMNI',
+            dairyFree: dto.dairyFree ?? false,
+            nutFree: dto.nutFree ?? false,
+            glutenFree: dto.glutenFree ?? false,
+            hasDiabetes: dto.hasDiabetes ?? false,
+            otherAllergies: dto.otherAllergies ?? [],
           },
         },
         tokenSet: { create: {} },
@@ -332,6 +332,8 @@ export class AuthService {
   }
 
   async updateDietaryProfile(userId: string, dto: UpdateDietaryProfileDto) {
+    console.log('updateDietaryProfile called with:', { userId, dto });
+    
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
       include: { dietaryProfile: true },
@@ -342,18 +344,20 @@ export class AuthService {
     }
 
     if (!user.dietaryProfile) {
+      console.log('Creating new dietary profile');
       await this.prismaService.userDietProfile.create({
         data: {
           userId: user.id,
-          vegType: dto.vegType || 'OMNI',
-          dairyFree: dto.dairyFree || false,
-          nutFree: dto.nutFree || false,
-          glutenFree: dto.glutenFree || false,
-          hasDiabetes: dto.hasDiabetes || false,
-          otherAllergies: dto.otherAllergies || [],
+          vegType: dto.vegType ?? 'OMNI',
+          dairyFree: dto.dairyFree ?? false,
+          nutFree: dto.nutFree ?? false,
+          glutenFree: dto.glutenFree ?? false,
+          hasDiabetes: dto.hasDiabetes ?? false,
+          otherAllergies: dto.otherAllergies ?? [],
         },
       });
     } else {
+      console.log('Updating existing dietary profile with:', dto);
       await this.prismaService.userDietProfile.update({
         where: { userId: user.id },
         data: {
@@ -386,6 +390,8 @@ export class AuthService {
 
     // Remove the camelCase version and only return snake_case
     const { dietaryProfile, ...userWithoutDietaryProfile } = updatedUser;
+
+    console.log('Returning updated dietary profile:', dietaryProfile);
 
     return {
       ...userWithoutDietaryProfile,
