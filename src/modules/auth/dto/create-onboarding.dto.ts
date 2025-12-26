@@ -23,4 +23,14 @@ export class CreateOnboardingDto {
   @IsString()
   @IsOptional()
   trackSurveyDay?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  dietaryRequirements?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  allergies?: string[];
 }

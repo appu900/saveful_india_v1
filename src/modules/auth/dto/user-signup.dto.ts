@@ -27,8 +27,9 @@ export class SignupDto {
   @IsString()
   stateCode: string;
 
+  @IsOptional()
   @IsEnum(VegType)
-  vegType: VegType;
+  vegType?: VegType;
 
   @IsOptional()
   @IsBoolean()

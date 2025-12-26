@@ -8,6 +8,7 @@ import { RedisModule } from './infra/cache/redis.module';
 import { RecipeModule } from './modules/recipe/recipe.module';
 import { S3ImageUploadModule } from './modules/s3-image-uoload/s3-image-uoload.module';
 import { IngrediantsModule } from './modules/ingrediants/ingrediants.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { IngrediantsModule } from './modules/ingrediants/ingrediants.module';
       isGlobal: true,
     }),
     AuthModule,
+    AdminModule,
     PrismaModule,
     RedisModule,
     RecipeModule,

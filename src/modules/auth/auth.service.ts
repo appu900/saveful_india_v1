@@ -108,12 +108,12 @@ export class AuthService {
         stateCode: dto.stateCode,
         dietaryProfile: {
           create: {
-            vegType: dto.vegType,
-            dairyFree: dto.dairyFree,
-            nutFree: dto.nutFree,
-            glutenFree: dto.glutenFree,
-            hasDiabetes: dto.hasDiabetes,
-            otherAllergies: dto.otherAllergies,
+            vegType: dto.vegType || 'OMNI',
+            dairyFree: dto.dairyFree || false,
+            nutFree: dto.nutFree || false,
+            glutenFree: dto.glutenFree || false,
+            hasDiabetes: dto.hasDiabetes || false,
+            otherAllergies: dto.otherAllergies || [],
           },
         },
         tokenSet: { create: {} },
@@ -281,7 +281,26 @@ export class AuthService {
         dietaryProfile: true,
       },
     });
-    return user;
+
+    if (!user) {
+      return null;
+    }
+
+    // Remove the camelCase version and only return snake_case
+    const { dietaryProfile, ...userWithoutDietaryProfile } = user;
+
+    return {
+      ...userWithoutDietaryProfile,
+      dietary_profile: dietaryProfile
+        ? {
+            veg_type: dietaryProfile.vegType,
+            dairy_free: dietaryProfile.dairyFree,
+            nut_free: dietaryProfile.nutFree,
+            gluten_free: dietaryProfile.glutenFree,
+            has_diabetes: dietaryProfile.hasDiabetes,
+          }
+        : null,
+    };
   }
 
   async refresh(refreshToken: string) {
@@ -348,9 +367,37 @@ export class AuthService {
       });
     }
 
+    // Return the updated user with dietary profile
+    const updatedUser = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        phoneNumber: true,
+        name: true,
+        stateCode: true,
+        dietaryProfile: true,
+      },
+    });
+
+    if (!updatedUser) {
+      throw new BadRequestException('User not found after update');
+    }
+
+    // Remove the camelCase version and only return snake_case
+    const { dietaryProfile, ...userWithoutDietaryProfile } = updatedUser;
+
     return {
-      success: true,
-      message: 'Dietary profile updated successfully',
+      ...userWithoutDietaryProfile,
+      dietary_profile: dietaryProfile
+        ? {
+            veg_type: dietaryProfile.vegType,
+            dairy_free: dietaryProfile.dairyFree,
+            nut_free: dietaryProfile.nutFree,
+            gluten_free: dietaryProfile.glutenFree,
+            has_diabetes: dietaryProfile.hasDiabetes,
+          }
+        : null,
     };
   }
 
@@ -372,6 +419,8 @@ export class AuthService {
         noOfChildren: dto.noOfChildren,
         tastePreference: dto.tastePreference || [],
         trackSurveyDay: dto.trackSurveyDay || null,
+        dietaryRequirements: dto.dietaryRequirements || [],
+        allergies: dto.allergies || [],
       },
       create: {
         userId: user.id,
@@ -381,6 +430,8 @@ export class AuthService {
         noOfChildren: dto.noOfChildren,
         tastePreference: dto.tastePreference || [],
         trackSurveyDay: dto.trackSurveyDay || null,
+        dietaryRequirements: dto.dietaryRequirements || [],
+        allergies: dto.allergies || [],
       },
     });
 
@@ -395,6 +446,8 @@ export class AuthService {
         },
         taste_preference: onboarding.tastePreference,
         track_survey_day: onboarding.trackSurveyDay,
+        dietary_requirements: onboarding.dietaryRequirements,
+        allergies: onboarding.allergies,
       },
     };
   }
@@ -418,6 +471,8 @@ export class AuthService {
         },
         taste_preference: onboarding.tastePreference,
         track_survey_day: onboarding.trackSurveyDay,
+        dietary_requirements: onboarding.dietaryRequirements,
+        allergies: onboarding.allergies,
       },
     };
   }
