@@ -94,5 +94,6 @@ export class RedisService implements OnModuleDestroy, OnModuleInit {
   async cacheInvalid(key: string): Promise<void> {
     if (!this.isConnected) return;
     await this.client.del(key);
+    console.log(`Cache invalidated for key: ${key}`);
   }
 }

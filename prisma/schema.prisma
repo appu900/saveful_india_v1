@@ -386,6 +386,26 @@ model Region {
   @@index([countryCode])
 }
 
+
+
+model HackCategory{
+  id        String   @id @default(uuid())
+  name      String
+  imageUrl  String?
+
+
+  hacks      Hacks[]
+}
+
+model Hacks{
+  id          String       @id @default(uuid())
+  title       String
+  description String
+  categoryId  String
+  category    HackCategory @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
 // ============================================
 // POST-MIGRATION SQL
 // Execute after running: npx prisma migrate dev

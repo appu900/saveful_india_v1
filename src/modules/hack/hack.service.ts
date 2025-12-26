@@ -31,7 +31,12 @@ export class HackService {
   //   ** fetch all categories and cache them **
   async getAllCategory() {
     const cacheKey = `${this.CACHE_PREFIX}`;
-    const hacks = await this.prisma.hackCategory.findMany({});
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+    const hacks = await this.prisma.hackCategory.findMany();
+    console.log('Hacks fetched from DB:', hacks);
     await this.redisService.set(cacheKey, JSON.stringify(hacks));
     return hacks;
   }
@@ -44,7 +49,7 @@ export class HackService {
     }
     const category = await this.prisma.hackCategory.findUnique({
       where: { id },
-      include: { Hacks: true },
+      include: { hacks: true },
     });
     await this.redisService.set(cacheKey, JSON.stringify(category));
     return category;
