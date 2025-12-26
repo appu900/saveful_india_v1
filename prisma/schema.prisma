@@ -55,9 +55,7 @@ enum IngredientType {
   OTHER
 }
 
-// ============================================
-// USER MODELS
-// ============================================
+
 
 model User {
   id           String   @id @default(uuid())
@@ -72,6 +70,7 @@ model User {
   tokenSet          TokenSet?
   sessions          UserSession[]
   dietaryProfile    UserDietProfile?
+  onboarding        UserOnboarding?
   cookedRecipes     CookedRecipe[]
   bookmarkedRecipes BookmarkedRecipe[]
 
@@ -105,7 +104,7 @@ model UserDietProfile {
   userId String @id
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  vegType        String
+  vegType        String   @default("OMNI")
   dairyFree      Boolean  @default(false)
   nutFree        Boolean  @default(false)
   glutenFree     Boolean  @default(false)
@@ -115,9 +114,23 @@ model UserDietProfile {
   updatedAt DateTime @updatedAt
 }
 
-// ============================================
-// USER RECIPE INTERACTIONS
-// ============================================
+model UserOnboarding {
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postcode            String   // Country code
+  suburb              String   // Country name
+  noOfAdults          Int      @default(1)
+  noOfChildren        Int      @default(0)
+  tastePreference     String[] @default([])
+  trackSurveyDay      String?
+  dietaryRequirements String[] @default([])
+  allergies           String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 
 model CookedRecipe {
   id String @id @default(uuid())
@@ -153,10 +166,6 @@ model BookmarkedRecipe {
   @@index([userId])
   @@index([recipeId])
 }
-
-// ============================================
-// INGREDIENT MODELS
-// ============================================
 
 model IngredientCategory {
   id          String       @id @default(uuid())

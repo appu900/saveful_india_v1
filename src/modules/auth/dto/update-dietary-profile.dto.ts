@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MinLength, IsEnum, IsBoolean } from 'class-validator';
+import { IsOptional, IsEnum, IsBoolean, IsArray, IsString } from 'class-validator';
 
 export enum VegType {
   OMNI = 'OMNI',
@@ -6,27 +6,7 @@ export enum VegType {
   VEGAN = 'VEGAN',
 }
 
-
-
-
-export class SignupDto {
-  @IsEmail()
-  email: string;
-
-  @MinLength(6)
-  password: string;
-
-  @IsOptional()
-  @IsString()
-  phoneNumber?: string;
-
-
-  @IsString()
-  name: string;
-
-  @IsString()
-  stateCode: string;
-
+export class UpdateDietaryProfileDto {
   @IsOptional()
   @IsEnum(VegType)
   vegType?: VegType;
@@ -48,5 +28,7 @@ export class SignupDto {
   hasDiabetes?: boolean;
 
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   otherAllergies?: string[];
 }

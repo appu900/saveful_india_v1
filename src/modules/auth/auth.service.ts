@@ -12,6 +12,8 @@ import { SignupDto } from './dto/user-signup.dto';
 import { v4 as uuid } from 'uuid';
 import { LoginDto } from './dto/user.login.dto';
 import { ChefSignupDto } from './dto/chef-signup.dto';
+import { UpdateDietaryProfileDto } from './dto/update-dietary-profile.dto';
+import { CreateOnboardingDto } from './dto/create-onboarding.dto';
 
 @Injectable()
 export class AuthService {
@@ -21,7 +23,7 @@ export class AuthService {
   ) {}
 
   private hash(data: string) {
-    return bcrypt.hash(data, 12);
+    return bcrypt.hash(data, 10);
   }
 
   private compareHash(data: string, hash: string) {
@@ -106,18 +108,29 @@ export class AuthService {
         stateCode: dto.stateCode,
         dietaryProfile: {
           create: {
-            vegType: dto.vegType,
-            dairyFree: dto.dairyFree,
-            nutFree: dto.nutFree,
-            glutenFree: dto.glutenFree,
-            hasDiabetes: dto.hasDiabetes,
-            otherAllergies: dto.otherAllergies,
+            vegType: dto.vegType || 'OMNI',
+            dairyFree: dto.dairyFree || false,
+            nutFree: dto.nutFree || false,
+            glutenFree: dto.glutenFree || false,
+            hasDiabetes: dto.hasDiabetes || false,
+            otherAllergies: dto.otherAllergies || [],
           },
         },
         tokenSet: { create: {} },
       },
     });
-    return this.issueToken(user.id, user.role);
+    const tokens = await this.issueToken(user.id, user.role);
+    return {
+      success: true,
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        phoneNumber: user.phoneNumber,
+      },
+    };
   }
   async createChef(dto: ChefSignupDto, adminId: string) {
     const admin = await this.prismaService.user.findUnique({
@@ -242,7 +255,18 @@ export class AuthService {
         userAgent: deviceInfo?.userAgent,
       },
     });
-    return this.issueToken(user.id, user.role);
+    const tokens = await this.issueToken(user.id, user.role);
+    return {
+      success: true,
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        phoneNumber: user.phoneNumber,
+      },
+    };
   }
 
   async getMe(userId: string) {
@@ -257,7 +281,26 @@ export class AuthService {
         dietaryProfile: true,
       },
     });
-    return user;
+
+    if (!user) {
+      return null;
+    }
+
+    // Remove the camelCase version and only return snake_case
+    const { dietaryProfile, ...userWithoutDietaryProfile } = user;
+
+    return {
+      ...userWithoutDietaryProfile,
+      dietary_profile: dietaryProfile
+        ? {
+            veg_type: dietaryProfile.vegType,
+            dairy_free: dietaryProfile.dairyFree,
+            nut_free: dietaryProfile.nutFree,
+            gluten_free: dietaryProfile.glutenFree,
+            has_diabetes: dietaryProfile.hasDiabetes,
+          }
+        : null,
+    };
   }
 
   async refresh(refreshToken: string) {
@@ -286,5 +329,151 @@ export class AuthService {
     } catch (error) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+  }
+
+  async updateDietaryProfile(userId: string, dto: UpdateDietaryProfileDto) {
+    const user = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      include: { dietaryProfile: true },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (!user.dietaryProfile) {
+      await this.prismaService.userDietProfile.create({
+        data: {
+          userId: user.id,
+          vegType: dto.vegType || 'OMNI',
+          dairyFree: dto.dairyFree || false,
+          nutFree: dto.nutFree || false,
+          glutenFree: dto.glutenFree || false,
+          hasDiabetes: dto.hasDiabetes || false,
+          otherAllergies: dto.otherAllergies || [],
+        },
+      });
+    } else {
+      await this.prismaService.userDietProfile.update({
+        where: { userId: user.id },
+        data: {
+          vegType: dto.vegType !== undefined ? dto.vegType : user.dietaryProfile.vegType,
+          dairyFree: dto.dairyFree !== undefined ? dto.dairyFree : user.dietaryProfile.dairyFree,
+          nutFree: dto.nutFree !== undefined ? dto.nutFree : user.dietaryProfile.nutFree,
+          glutenFree: dto.glutenFree !== undefined ? dto.glutenFree : user.dietaryProfile.glutenFree,
+          hasDiabetes: dto.hasDiabetes !== undefined ? dto.hasDiabetes : user.dietaryProfile.hasDiabetes,
+          otherAllergies: dto.otherAllergies !== undefined ? dto.otherAllergies : user.dietaryProfile.otherAllergies,
+        },
+      });
+    }
+
+    // Return the updated user with dietary profile
+    const updatedUser = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        phoneNumber: true,
+        name: true,
+        stateCode: true,
+        dietaryProfile: true,
+      },
+    });
+
+    if (!updatedUser) {
+      throw new BadRequestException('User not found after update');
+    }
+
+    // Remove the camelCase version and only return snake_case
+    const { dietaryProfile, ...userWithoutDietaryProfile } = updatedUser;
+
+    return {
+      ...userWithoutDietaryProfile,
+      dietary_profile: dietaryProfile
+        ? {
+            veg_type: dietaryProfile.vegType,
+            dairy_free: dietaryProfile.dairyFree,
+            nut_free: dietaryProfile.nutFree,
+            gluten_free: dietaryProfile.glutenFree,
+            has_diabetes: dietaryProfile.hasDiabetes,
+          }
+        : null,
+    };
+  }
+
+  async createOnboarding(userId: string, dto: CreateOnboardingDto) {
+    const user = await this.prismaService.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const onboarding = await this.prismaService.userOnboarding.upsert({
+      where: { userId: user.id },
+      update: {
+        postcode: dto.postcode,
+        suburb: dto.suburb,
+        noOfAdults: dto.noOfAdults,
+        noOfChildren: dto.noOfChildren,
+        tastePreference: dto.tastePreference || [],
+        trackSurveyDay: dto.trackSurveyDay || null,
+        dietaryRequirements: dto.dietaryRequirements || [],
+        allergies: dto.allergies || [],
+      },
+      create: {
+        userId: user.id,
+        postcode: dto.postcode,
+        suburb: dto.suburb,
+        noOfAdults: dto.noOfAdults,
+        noOfChildren: dto.noOfChildren,
+        tastePreference: dto.tastePreference || [],
+        trackSurveyDay: dto.trackSurveyDay || null,
+        dietaryRequirements: dto.dietaryRequirements || [],
+        allergies: dto.allergies || [],
+      },
+    });
+
+    return {
+      success: true,
+      onboarding: {
+        postcode: onboarding.postcode,
+        suburb: onboarding.suburb,
+        no_of_people: {
+          adults: onboarding.noOfAdults,
+          children: onboarding.noOfChildren,
+        },
+        taste_preference: onboarding.tastePreference,
+        track_survey_day: onboarding.trackSurveyDay,
+        dietary_requirements: onboarding.dietaryRequirements,
+        allergies: onboarding.allergies,
+      },
+    };
+  }
+
+  async getOnboarding(userId: string) {
+    const onboarding = await this.prismaService.userOnboarding.findUnique({
+      where: { userId },
+    });
+
+    if (!onboarding) {
+      return { onboarding: null };
+    }
+
+    return {
+      onboarding: {
+        postcode: onboarding.postcode,
+        suburb: onboarding.suburb,
+        no_of_people: {
+          adults: onboarding.noOfAdults,
+          children: onboarding.noOfChildren,
+        },
+        taste_preference: onboarding.tastePreference,
+        track_survey_day: onboarding.trackSurveyDay,
+        dietary_requirements: onboarding.dietaryRequirements,
+        allergies: onboarding.allergies,
+      },
+    };
   }
 }
