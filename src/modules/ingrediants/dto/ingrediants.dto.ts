@@ -1,12 +1,26 @@
 import { IsString, IsOptional, IsArray, IsBoolean, Min, Max, IsInt, IsUrl } from 'class-validator';
 import { Transform } from 'class-transformer';
 
-const toBoolean = (value: any): boolean => {
+const toBoolean = (value: any): boolean | undefined => {
+  console.log('toBoolean called with:', { value, type: typeof value, raw: JSON.stringify(value) });
+  
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  
   if (typeof value === 'string') {
     const normalized = value.toLowerCase().trim();
     if (normalized === 'true') return true;
     if (normalized === 'false') return false;
+    if (normalized === '') return undefined; // Empty string = not provided
   }
+  
+  // If we get here, something unexpected happened
+  console.warn('toBoolean: unexpected value type', { value, type: typeof value });
   return Boolean(value);
 };
 
