@@ -14,7 +14,8 @@ import { RefreshTokenDto } from './dto/user.refreshToken.dto';
 import { JwtAuthGuard } from './guards/jwt.auth.guard';
 import { ChefSignupDto } from './dto/chef-signup.dto';
 import { GetUser } from '../../common/decorators/get-user.decorator';
-import { AdminSignupDto } from './dto/admin-signup.dto';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -32,14 +33,11 @@ export class AuthController {
     return this.authService.signup(dto);
   }
 
-  @Post('/chef/signup')
-  createChef(@Body() dto: ChefSignupDto) {
-    return this.authService.createChef(dto);
-  }
-
-  @Post('/admin/signup')
-  createAdmin(@Body() dto: AdminSignupDto) {
-    return this.authService.createAdmin(dto);
+  @Post('chef/create')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  createChef(@Body() dto: ChefSignupDto, @GetUser() admin: any) {
+    return this.authService.createChef(dto, admin.userId);
   }
 
   @Post('login')

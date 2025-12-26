@@ -174,7 +174,6 @@ export class AuthService {
     };
   }
 
-<<<<<<< HEAD
   async roleBasedLogin(
     dto: LoginDto,
     expectedRole: string,
@@ -182,13 +181,6 @@ export class AuthService {
   ) {
     const user = await this.prismaService.user.findUnique({
       where: { email: dto.email },
-=======
-  async createAdmin(dto: AdminSignupDto) {
-    const exists = await this.prismaService.user.findUnique({
-      where: {
-        email: dto.email,
-      },
->>>>>>> 2369f18c015467cbdc8309de0bec81f08301f434
     });
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
