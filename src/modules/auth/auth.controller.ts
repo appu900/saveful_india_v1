@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -16,6 +17,8 @@ import { ChefSignupDto } from './dto/chef-signup.dto';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { UpdateDietaryProfileDto } from './dto/update-dietary-profile.dto';
+import { CreateOnboardingDto } from './dto/create-onboarding.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -68,5 +71,30 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@GetUser() user: any) {
     return this.authService.getMe(user.userId);
+  }
+
+  @Put('dietary-profile')
+  @UseGuards(JwtAuthGuard)
+  updateDietaryProfile(
+    @GetUser() user: any,
+    @Body() dto: UpdateDietaryProfileDto,
+  ) {
+    return this.authService.updateDietaryProfile(user.userId, dto);
+  }
+
+  @Post('onboarding')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  createOnboarding(
+    @GetUser() user: any,
+    @Body() dto: CreateOnboardingDto,
+  ) {
+    return this.authService.createOnboarding(user.userId, dto);
+  }
+
+  @Get('onboarding')
+  @UseGuards(JwtAuthGuard)
+  getOnboarding(@GetUser() user: any) {
+    return this.authService.getOnboarding(user.userId);
   }
 }

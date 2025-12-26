@@ -12,6 +12,8 @@ import { SignupDto } from './dto/user-signup.dto';
 import { v4 as uuid } from 'uuid';
 import { LoginDto } from './dto/user.login.dto';
 import { ChefSignupDto } from './dto/chef-signup.dto';
+import { UpdateDietaryProfileDto } from './dto/update-dietary-profile.dto';
+import { CreateOnboardingDto } from './dto/create-onboarding.dto';
 
 @Injectable()
 export class AuthService {
@@ -308,5 +310,115 @@ export class AuthService {
     } catch (error) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+  }
+
+  async updateDietaryProfile(userId: string, dto: UpdateDietaryProfileDto) {
+    const user = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      include: { dietaryProfile: true },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (!user.dietaryProfile) {
+      await this.prismaService.userDietProfile.create({
+        data: {
+          userId: user.id,
+          vegType: dto.vegType || 'OMNI',
+          dairyFree: dto.dairyFree || false,
+          nutFree: dto.nutFree || false,
+          glutenFree: dto.glutenFree || false,
+          hasDiabetes: dto.hasDiabetes || false,
+          otherAllergies: dto.otherAllergies || [],
+        },
+      });
+    } else {
+      await this.prismaService.userDietProfile.update({
+        where: { userId: user.id },
+        data: {
+          vegType: dto.vegType !== undefined ? dto.vegType : user.dietaryProfile.vegType,
+          dairyFree: dto.dairyFree !== undefined ? dto.dairyFree : user.dietaryProfile.dairyFree,
+          nutFree: dto.nutFree !== undefined ? dto.nutFree : user.dietaryProfile.nutFree,
+          glutenFree: dto.glutenFree !== undefined ? dto.glutenFree : user.dietaryProfile.glutenFree,
+          hasDiabetes: dto.hasDiabetes !== undefined ? dto.hasDiabetes : user.dietaryProfile.hasDiabetes,
+          otherAllergies: dto.otherAllergies !== undefined ? dto.otherAllergies : user.dietaryProfile.otherAllergies,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Dietary profile updated successfully',
+    };
+  }
+
+  async createOnboarding(userId: string, dto: CreateOnboardingDto) {
+    const user = await this.prismaService.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const onboarding = await this.prismaService.userOnboarding.upsert({
+      where: { userId: user.id },
+      update: {
+        postcode: dto.postcode,
+        suburb: dto.suburb,
+        noOfAdults: dto.noOfAdults,
+        noOfChildren: dto.noOfChildren,
+        tastePreference: dto.tastePreference || [],
+        trackSurveyDay: dto.trackSurveyDay || null,
+      },
+      create: {
+        userId: user.id,
+        postcode: dto.postcode,
+        suburb: dto.suburb,
+        noOfAdults: dto.noOfAdults,
+        noOfChildren: dto.noOfChildren,
+        tastePreference: dto.tastePreference || [],
+        trackSurveyDay: dto.trackSurveyDay || null,
+      },
+    });
+
+    return {
+      success: true,
+      onboarding: {
+        postcode: onboarding.postcode,
+        suburb: onboarding.suburb,
+        no_of_people: {
+          adults: onboarding.noOfAdults,
+          children: onboarding.noOfChildren,
+        },
+        taste_preference: onboarding.tastePreference,
+        track_survey_day: onboarding.trackSurveyDay,
+      },
+    };
+  }
+
+  async getOnboarding(userId: string) {
+    const onboarding = await this.prismaService.userOnboarding.findUnique({
+      where: { userId },
+    });
+
+    if (!onboarding) {
+      return { onboarding: null };
+    }
+
+    return {
+      onboarding: {
+        postcode: onboarding.postcode,
+        suburb: onboarding.suburb,
+        no_of_people: {
+          adults: onboarding.noOfAdults,
+          children: onboarding.noOfChildren,
+        },
+        taste_preference: onboarding.tastePreference,
+        track_survey_day: onboarding.trackSurveyDay,
+      },
+    };
   }
 }
