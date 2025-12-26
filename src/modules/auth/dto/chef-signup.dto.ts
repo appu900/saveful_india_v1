@@ -3,21 +3,20 @@ import {
   IsOptional,
   IsString,
   MinLength,
-  IsEnum,
-  IsBoolean,
-  isString,
 } from 'class-validator';
 
 export class ChefSignupDto {
   @IsString()
-  fullname: string;
+  name: string;
 
-  @IsString()
+  @IsEmail()
   email: string;
 
   @IsString()
+  @MinLength(6)
   password: string;
 
+  @IsOptional()
   @IsString()
-  phoneNumber: string;
+  phoneNumber?: string;
 }
