@@ -7,6 +7,7 @@ import { JwtStrategy } from './strategy/jwt.startegy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../infra/database/prisma.service';
 import { ChefManagementController } from './chef-management.controller';
+import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ChefManagementController } from './chef-management.controller';
   ],
 
   controllers: [AuthController, ChefManagementController],
-  providers: [AuthService, JwtStrategy, PrismaService],
+  providers: [AuthService, JwtStrategy, PrismaService, RolesGuard],
+  exports: [RolesGuard],
 })
 export class AuthModule {}

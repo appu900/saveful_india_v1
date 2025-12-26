@@ -21,7 +21,7 @@ export class AuthService {
   ) {}
 
   private hash(data: string) {
-    return bcrypt.hash(data, 12);
+    return bcrypt.hash(data, 10);
   }
 
   private compareHash(data: string, hash: string) {
@@ -117,7 +117,18 @@ export class AuthService {
         tokenSet: { create: {} },
       },
     });
-    return this.issueToken(user.id, user.role);
+    const tokens = await this.issueToken(user.id, user.role);
+    return {
+      success: true,
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        phoneNumber: user.phoneNumber,
+      },
+    };
   }
   async createChef(dto: ChefSignupDto, adminId: string) {
     const admin = await this.prismaService.user.findUnique({
@@ -242,7 +253,18 @@ export class AuthService {
         userAgent: deviceInfo?.userAgent,
       },
     });
-    return this.issueToken(user.id, user.role);
+    const tokens = await this.issueToken(user.id, user.role);
+    return {
+      success: true,
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        phoneNumber: user.phoneNumber,
+      },
+    };
   }
 
   async getMe(userId: string) {
