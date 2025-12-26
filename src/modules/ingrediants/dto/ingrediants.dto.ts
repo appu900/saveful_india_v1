@@ -1,20 +1,28 @@
-// src/ingredients/dto/ingredient.dto.ts
-import {
-  IsString,
-  IsOptional,
-  IsArray,
-  IsEnum,
-  IsBoolean,
-  IsObject,
-  ValidateIf,
-  Min,
-  Max,
-  IsInt,
-  IsUrl,
-} from 'class-validator';
-import { Type, Transform } from 'class-transformer';
-import { IngredientType, Season, UserRole } from '@prisma/client';
-import { isNativeError } from 'util/types';
+import { IsString, IsOptional, IsArray, IsBoolean, Min, Max, IsInt, IsUrl } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+const toBoolean = (value: any): boolean => {
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase().trim();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  return Boolean(value);
+};
+
+const parseStringArray = (value: any): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+  return [];
+};
 
 export class CreateIngredientDto {
   @IsString()
@@ -23,15 +31,7 @@ export class CreateIngredientDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) =>
-    value
-      ? Array.isArray(value)
-        ? value
-        : typeof value === 'string'
-          ? JSON.parse(value)
-          : []
-      : [],
-  )
+  @Transform(({ value }) => parseStringArray(value))
   aliases?: string[];
 
   @IsOptional()
@@ -42,28 +42,9 @@ export class CreateIngredientDto {
   @IsString()
   description?: string;
 
-
   @IsOptional()
   @IsString()
-  nutritionInfo?: any;
-
-  @IsOptional()
-  @IsEnum(IngredientType)
-  type?: IngredientType;
-
-  @IsOptional()
-  @IsArray()
-  @IsEnum(Season, { each: true })
-  @Transform(({ value }) =>
-    value
-      ? Array.isArray(value)
-        ? value
-        : typeof value === 'string'
-          ? JSON.parse(value)
-          : []
-      : [],
-  )
-  availableSeasons?: Season[];
+  nutritionInfo?: string;
 
   @IsOptional()
   @IsString()
@@ -71,59 +52,143 @@ export class CreateIngredientDto {
 
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => toBoolean(value))
   isVeg?: boolean;
 
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => toBoolean(value))
   isVegan?: boolean;
 
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => toBoolean(value))
   isDairy?: boolean;
 
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => toBoolean(value))
   isNut?: boolean;
 
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => toBoolean(value))
   isGluten?: boolean;
 
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) =>
-    value
-      ? Array.isArray(value)
-        ? value
-        : typeof value === 'string'
-          ? JSON.parse(value)
-          : []
-      : [],
-  )
+  @Transform(({ value }) => parseStringArray(value))
   tags?: string[];
 
+  @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
-  isFruit: boolean;
-
-  @IsBoolean()
-  @Transform(({ value }) => value === 'true')
-  isVegetable: boolean;
+  @Transform(({ value }) => toBoolean(value))
+  hasPage?: boolean;
 
   @IsOptional()
-  @IsEnum(UserRole)
-  addedBy?: UserRole;
+  @IsString()
+  theme?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => parseStringArray(value))
+  inSeasonMonths?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => toBoolean(value))
+  isPantryItem?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Transform(({ value }) => (value !== undefined && value !== null && value !== '' ? parseInt(value, 10) : undefined))
+  averageWeight?: number;
 }
 
-export class UpdateIngredientDto extends CreateIngredientDto {
+export class UpdateIngredientDto {
+  @IsOptional()
   @IsString()
-  id: string;
+  name?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => parseStringArray(value))
+  aliases?: string[];
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  nutritionInfo?: string;
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => toBoolean(value))
+  isVeg?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => toBoolean(value))
+  isVegan?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => toBoolean(value))
+  isDairy?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => toBoolean(value))
+  isNut?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => toBoolean(value))
+  isGluten?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => parseStringArray(value))
+  tags?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => toBoolean(value))
+  hasPage?: boolean;
+
+  @IsOptional()
+  @IsString()
+  theme?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => parseStringArray(value))
+  inSeasonMonths?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => toBoolean(value))
+  isPantryItem?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Transform(({ value }) => (value !== undefined && value !== null && value !== '' ? parseInt(value, 10) : undefined))
+  averageWeight?: number;
 }
 
 export class SearchIngredientsDto {
@@ -132,25 +197,17 @@ export class SearchIngredientsDto {
   query?: string;
 
   @IsOptional()
-  @IsEnum(IngredientType)
-  type?: IngredientType;
-
-  @IsOptional()
-  @IsEnum(Season)
-  season?: Season;
-
-  @IsOptional()
   @IsString()
   categoryId?: string;
 
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => toBoolean(value))
   isVeg?: boolean;
 
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => toBoolean(value))
   isVegan?: boolean;
 
   @IsOptional()

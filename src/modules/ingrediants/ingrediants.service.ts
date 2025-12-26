@@ -13,10 +13,9 @@ import {
   SearchIngredientsDto,
   UpdateIngredientDto,
 } from './dto/ingrediants.dto';
-import { Ingredient, IngredientType, Season, UserRole } from '@prisma/client';
+import { Ingredient } from '@prisma/client';
 
 import { createIngrediantCategoryDto } from './dto/ingrediants.category.dto';
-import { createZstdDecompress } from 'zlib';
 
 @Injectable()
 export class IngrediantsService {
@@ -30,6 +29,8 @@ export class IngrediantsService {
 
   async createIngredient(dto: CreateIngredientDto): Promise<Ingredient> {
     this.logger.log(`Creating ingredient: ${dto.name}`);
+    this.logger.log('Received DTO:', JSON.stringify(dto, null, 2));
+    
     const slug = this.generateSlug(dto.name);
     // Check if ingredient exists
     const existing = await this.prisma.ingredient.findFirst({
@@ -47,20 +48,20 @@ export class IngrediantsService {
         aliases: dto.aliases || [],
         imageUrl: dto.imageUrl,
         description: dto.description,
-        nutritionInfo: dto.nutritionInfo ?? 'no information available',
-        type: dto.type || IngredientType.OTHER,
-        availableSeasons: dto.availableSeasons || [Season.ALL_SEASON],
+        nutritionInfo: dto.nutritionInfo ?? null,
         categoryId: dto.categoryId,
-        isVeg: dto.isVeg ?? true,
-        isVegan: dto.isVegan ?? true,
+        isVeg: dto.isVeg ?? false,
+        isVegan: dto.isVegan ?? false,
         isDairy: dto.isDairy ?? false,
         isNut: dto.isNut ?? false,
         isGluten: dto.isGluten ?? false,
-        isFruit: dto.isFruit ?? false,
-        isVegetable: dto.isVegetable ?? false,
+        hasPage: dto.hasPage ?? false,
         tags: dto.tags || [],
-        addedBy: dto.addedBy || UserRole.ADMIN,
-        isVerified:true,
+        theme: dto.theme,
+        inSeasonMonths: dto.inSeasonMonths || [],
+        isPantryItem: dto.isPantryItem ?? false,
+        averageWeight: dto.averageWeight ?? null,
+        isVerified: true,
       },
       include: {
         category: true,
@@ -68,6 +69,76 @@ export class IngrediantsService {
     });
     await this.invalidateCache();
     this.logger.log(`Ingredient created: ${ingredient.id}`);
+    return ingredient;
+  }
+
+  async updateIngredient(id: string, dto: UpdateIngredientDto): Promise<Ingredient> {
+    this.logger.log(`Updating ingredient: ${id}`);
+    this.logger.log('Received DTO:', JSON.stringify(dto, null, 2));
+    
+    this.logger.log('Boolean values in DTO:', {
+      isVeg: dto.isVeg,
+      isVegan: dto.isVegan,
+      isDairy: dto.isDairy,
+      isNut: dto.isNut,
+      isGluten: dto.isGluten,
+      hasPage: dto.hasPage,
+      isPantryItem: dto.isPantryItem,
+    });
+    
+    // Check if ingredient exists
+    const existing = await this.prisma.ingredient.findUnique({
+      where: { id },
+    });
+    
+    if (!existing) {
+      throw new NotFoundException(`Ingredient with ID ${id} not found`);
+    }
+
+    // Check if name is being changed and if new name already exists
+    if (dto.name && dto.name !== existing.name) {
+      const nameExists = await this.prisma.ingredient.findFirst({
+        where: {
+          name: { equals: dto.name, mode: 'insensitive' },
+          NOT: { id },
+        },
+      });
+      if (nameExists) {
+        throw new BadRequestException(`Ingredient "${dto.name}" already exists`);
+      }
+    }
+
+    const slug = dto.name ? this.generateSlug(dto.name) : existing.slug;
+
+    const ingredient = await this.prisma.ingredient.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        slug,
+        aliases: dto.aliases ?? existing.aliases,
+        imageUrl: dto.imageUrl ?? existing.imageUrl,
+        description: dto.description ?? existing.description,
+        nutritionInfo: dto.nutritionInfo ?? existing.nutritionInfo,
+        categoryId: dto.categoryId ?? existing.categoryId,
+        isVeg: dto.isVeg !== undefined ? dto.isVeg : existing.isVeg,
+        isVegan: dto.isVegan !== undefined ? dto.isVegan : existing.isVegan,
+        isDairy: dto.isDairy !== undefined ? dto.isDairy : existing.isDairy,
+        isNut: dto.isNut !== undefined ? dto.isNut : existing.isNut,
+        isGluten: dto.isGluten !== undefined ? dto.isGluten : existing.isGluten,
+        hasPage: dto.hasPage !== undefined ? dto.hasPage : existing.hasPage,
+        tags: dto.tags ?? existing.tags,
+        theme: dto.theme ?? existing.theme,
+        inSeasonMonths: dto.inSeasonMonths ?? existing.inSeasonMonths,
+        isPantryItem: dto.isPantryItem ?? existing.isPantryItem,
+        averageWeight: dto.averageWeight ?? existing.averageWeight,
+      },
+      include: {
+        category: true,
+      },
+    });
+
+    await this.invalidateCache();
+    this.logger.log(`Ingredient updated: ${ingredient.id}`);
     return ingredient;
   }
 
@@ -131,8 +202,6 @@ export class IngrediantsService {
   async searchIngredients(dto: SearchIngredientsDto) {
     const {
       query,
-      type,
-      season,
       categoryId,
       isVeg,
       isVegan,
@@ -153,18 +222,6 @@ export class IngrediantsService {
           { name: { contains: query, mode: 'insensitive' } },
           { aliases: { has: query.toLowerCase() } },
         ],
-      });
-    }
-    // Filter by type
-    if (type) {
-      where.AND.push({ type });
-    }
-    // Filter by season
-    if (season) {
-      where.AND.push({
-        availableSeasons: {
-          has: season,
-        },
       });
     }
     // Filter by category
@@ -207,56 +264,6 @@ export class IngrediantsService {
   }
 
   /**
-   *  UPDATE INGREDIENT
-   */
-  async updateIngredient(dto: UpdateIngredientDto): Promise<Ingredient> {
-    const existing = await this.prisma.ingredient.findUnique({
-      where: { id: dto.id },
-    });
-    if (!existing) {
-      throw new NotFoundException(`Ingredient with ID ${dto.id} not found`);
-    }
-    // Delete old image if new image is provided
-    if (
-      dto.imageUrl &&
-      existing.imageUrl &&
-      dto.imageUrl !== existing.imageUrl
-    ) {
-      await this.s3Upload.deleteImage(existing.imageUrl);
-    }
-    const updateData: any = {};
-    if (dto.name) {
-      updateData.name = dto.name;
-      updateData.slug = this.generateSlug(dto.name);
-    }
-    if (dto.aliases !== undefined) updateData.aliases = dto.aliases;
-    if (dto.imageUrl !== undefined) updateData.imageUrl = dto.imageUrl;
-    if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.nutritionInfo !== undefined)
-      updateData.nutritionInfo = dto.nutritionInfo;
-    if (dto.type !== undefined) updateData.type = dto.type;
-    if (dto.availableSeasons !== undefined)
-      updateData.availableSeasons = dto.availableSeasons;
-    if (dto.categoryId !== undefined) updateData.categoryId = dto.categoryId;
-    if (dto.isVeg !== undefined) updateData.isVeg = dto.isVeg;
-    if (dto.isVegan !== undefined) updateData.isVegan = dto.isVegan;
-    if (dto.isDairy !== undefined) updateData.isDairy = dto.isDairy;
-    if (dto.isNut !== undefined) updateData.isNut = dto.isNut;
-    if (dto.isGluten !== undefined) updateData.isGluten = dto.isGluten;
-    if (dto.tags !== undefined) updateData.tags = dto.tags;
-    const updated = await this.prisma.ingredient.update({
-      where: { id: dto.id },
-      data: updateData,
-      include: {
-        category: true,
-      },
-    });
-    await this.invalidateCacheForIngredient(dto.id, existing.slug);
-    this.logger.log(`Ingredient updated: ${dto.id}`);
-    return updated;
-  }
-
-  /**
    *  VERIFY INGREDIENT (Admin only)
    */
   async verifyIngredient(id: string): Promise<Ingredient> {
@@ -272,7 +279,7 @@ export class IngrediantsService {
   /**
    * 🗑️ DELETE INGREDIENT
    */
-  async deleteIngredient(id: string): Promise<void> {
+  async deleteIngredient(id: string): Promise<{ success: boolean; message: string }> {
     this.logger.log(`Deleting ingredient: ${id}`);
     const ingredient = await this.prisma.ingredient.findUnique({
       where: { id },
@@ -297,6 +304,7 @@ export class IngrediantsService {
     });
     await this.invalidateCacheForIngredient(id, ingredient.slug);
     this.logger.log(`Ingredient deleted: ${id}`);
+    return { success: true, message: 'Ingredient deleted successfully' };
   }
 
   /**
@@ -348,28 +356,6 @@ export class IngrediantsService {
     }
   }
 
-  /**
-   * Get ingredients by season (with cache)
-   */
-  async getIngredientsBySeason(season: Season, limit: number = 50) {
-    // const cacheKey = `ingredients:season:${season}:${limit}`;
-    // const cached = await this.redis.get(cacheKey);
-    // console.log(cached)
-    // if (cached) return JSON.parse(cached);
-
-    const ingredients = await this.prisma.ingredient.findMany({
-      where: {
-        availableSeasons: { has: season as Season },
-        isVerified: true,
-      },
-      take: limit,
-      orderBy: { name: 'asc' },
-    });
-
-    // await this.redis.setex(cacheKey, 3600, JSON.stringify(ingredients)); // 1hr cache
-    return ingredients;
-  }
-
   async getIngredientByCategory(categoryId: string) {
     // const cacheKey = `ingredients_cat:${categoryId}data`;
     // const cached = await this.redis.get(cacheKey);
@@ -391,38 +377,6 @@ export class IngrediantsService {
     // await this.redis.setex(cacheKey, 3600, JSON.stringify(ingrediants));
     return ingrediants;
   }
-
-  /**
-   * Get current season's ingredients
-   */
-  async getCurrentSeasonIngredients(limit: number = 50) {
-    const currentSeason = this.getCurrentSeason();
-    return this.getIngredientsBySeason(currentSeason, limit);
-  }
-
-  /**
-   * Get vegetables only
-   */
-  async getVegetables(limit: number = 50) {
-    return this.prisma.ingredient.findMany({
-      where: { type: IngredientType.VEGETABLE, isVerified: true },
-      take: limit,
-    });
-  }
-
-  /**
-   * Get fruits only
-   */
-  async getFruits(limit: number = 50) {
-    return this.prisma.ingredient.findMany({
-      where: { type: IngredientType.FRUIT, isVerified: true },
-      take: limit,
-    });
-  }
-
-  /**
-   * Admin verifies chef-added ingredient
-   */
 
   /**
    * create ingredinats category
@@ -452,17 +406,81 @@ export class IngrediantsService {
     return this.prisma.ingredientCategory.findMany();
   }
 
-  async fetchAllIngrediants() {
-    return this.prisma.ingredient.findMany({});
+  // ** update ingredient category
+  async updateIngrediantsCategory(id: string, dto: createIngrediantCategoryDto) {
+    const category = await this.prisma.ingredientCategory.findUnique({
+      where: { id },
+    });
+    
+    if (!category) {
+      throw new NotFoundException(`Category with ID ${id} not found`);
+    }
+
+    // Check if name already exists (excluding current category)
+    const existingCategory = await this.prisma.ingredientCategory.findFirst({
+      where: {
+        name: dto.name,
+        NOT: { id },
+      },
+    });
+
+    if (existingCategory) {
+      throw new ConflictException('A category with this name already exists');
+    }
+
+    const updatedCategory = await this.prisma.ingredientCategory.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        description: dto.description,
+      },
+    });
+
+    return updatedCategory;
   }
 
-  private getCurrentSeason(): Season {
-    const month = new Date().getMonth() + 1; // 1-12
+  // ** delete ingredient category
+  async deleteIngrediantsCategory(id: string) {
+    const category = await this.prisma.ingredientCategory.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { ingredients: true },
+        },
+      },
+    });
 
-    if (month >= 3 && month <= 5) return 'SPRING';
-    if (month >= 6 && month <= 8) return 'SUMMER';
-    if (month >= 9 && month <= 11) return 'FALL';
-    return 'WINTER';
+    if (!category) {
+      throw new NotFoundException(`Category with ID ${id} not found`);
+    }
+
+    // Check if category has ingredients
+    if (category._count.ingredients > 0) {
+      throw new BadRequestException(
+        `Cannot delete category "${category.name}" because it contains ${category._count.ingredients} ingredient(s). Please reassign or delete the ingredients first.`
+      );
+    }
+
+    await this.prisma.ingredientCategory.delete({
+      where: { id },
+    });
+
+    return {
+      success: true,
+      message: `Category "${category.name}" has been deleted successfully`,
+    };
+  }
+
+  async fetchAllIngrediants() {
+    const ingredients = await this.prisma.ingredient.findMany({
+      include: {
+        category: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    return { ingredients };
   }
 
   private generateSlug(text: string): string {

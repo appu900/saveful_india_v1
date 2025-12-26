@@ -32,31 +32,6 @@ enum RecipeType {
   SIDE_DISH
 }
 
-enum Season {
-  SPRING
-  SUMMER
-  FALL
-  WINTER
-  ALL_SEASON
-}
-
-enum IngredientType {
-  VEGETABLE
-  FRUIT
-  GRAIN
-  PROTEIN
-  DAIRY
-  SPICE
-  OIL
-  CONDIMENT
-  HERB
-  NUT
-  SEED
-  OTHER
-}
-
-
-
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -188,27 +163,25 @@ model Ingredient {
 
   imageUrl      String?
   description   String?
-  nutritionInfo String? // Structured nutrition data
-
-  type             IngredientType @default(OTHER)
-  availableSeasons Season[]       @default([ALL_SEASON])
+  nutritionInfo String?
 
   categoryId String?
   category   IngredientCategory? @relation(fields: [categoryId], references: [id])
 
-  // Dietary properties
-  isVeg       Boolean  @default(true)
-  isVegan     Boolean  @default(true)
-  isDairy     Boolean  @default(false)
-  isNut       Boolean  @default(false)
-  isGluten    Boolean  @default(false)
-  isFruit     Boolean?
-  isVegetable Boolean?
+  isVeg    Boolean @default(false)
+  isVegan  Boolean @default(false)
+  isDairy  Boolean @default(false)
+  isNut    Boolean @default(false)
+  isGluten Boolean @default(false)
+  hasPage  Boolean @default(false)
 
-  tags String[] @default([])
+  tags           String[] @default([])
+  theme          String?
+  inSeasonMonths String[] @default([])
+  isPantryItem   Boolean  @default(false)
+  averageWeight  Int?
 
-  addedBy    UserRole @default(ADMIN)
-  isVerified Boolean  @default(false)
+  isVerified Boolean @default(false)
 
   recipeIngredients RecipeIngredient[]
 
@@ -218,7 +191,6 @@ model Ingredient {
   @@index([name])
   @@index([slug])
   @@index([categoryId])
-  @@index([type])
   @@index([isVerified])
 }
 

@@ -9,8 +9,6 @@ import {
   UploadedFile,
   Param,
   Query,
-  DefaultValuePipe,
-  ParseIntPipe,
   Delete,
   BadRequestException,
 } from '@nestjs/common';
@@ -21,10 +19,10 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   CreateIngredientDto,
+  UpdateIngredientDto,
   SearchIngredientsDto,
 } from './dto/ingrediants.dto';
 import { GetUser } from '../../common/decorators/get-user.decorator';
-import { Season } from '@prisma/client';
 import { createIngrediantCategoryDto } from './dto/ingrediants.category.dto';
 import { S3ImageUploadService } from '../s3-image-uoload/s3-image-uoload.service';
 
@@ -36,15 +34,86 @@ export class IngrediantsController {
   ) {}
 
   @Post('/category')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'CHEF')
   async createCategory(@Body() dto: createIngrediantCategoryDto) {
     return this.ingredientsService.createIngrediantsCategory(dto);
   }
+
   @Get('/category')
   async fetchCategory() {
     return this.ingredientsService.fetchAllIngrediantsCategory();
   }
 
-  @Post('')
+  @Patch('/category/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'CHEF')
+  async updateCategory(
+    @Param('id') id: string,
+    @Body() dto: createIngrediantCategoryDto
+  ) {
+    return this.ingredientsService.updateIngrediantsCategory(id, dto);
+  }
+
+  @Delete('/category/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'CHEF')
+  async deleteCategory(@Param('id') id: string) {
+    return this.ingredientsService.deleteIngrediantsCategory(id);
+  }
+
+  /**
+   * Get all ingredients
+   * GET /ingrediants
+   */
+  @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'CHEF')
+  async fetchAllIngrediants() {
+    return this.ingredientsService.fetchAllIngrediants();
+  }
+
+ 
+  @Get('search')
+  search(@Query() searchIngredientsDto: SearchIngredientsDto) {
+    return this.ingredientsService.searchIngredients(searchIngredientsDto);
+  }
+
+  /**
+   * Get by slug
+   * GET /ingrediants/slug/:slug
+   */
+  @Get('slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.ingredientsService.getIngredientBySlug(slug);
+  }
+
+  /**
+   * Get ingredients by category
+   * GET /ingrediants/filter/:categoryId
+   */
+  @Get('filter/:categoryId')
+  async fetchIngrediantsById(@Param('categoryId') categoryId: string) {
+    if (!categoryId) {
+      throw new BadRequestException('Bad request');
+    }
+    return this.ingredientsService.getIngredientByCategory(categoryId)
+  }
+
+  /**
+   * Get ingredient by ID
+   * GET /ingrediants/:id
+   */
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.ingredientsService.getIngredientById(id);
+  }
+
+  /**
+   * Create new ingredient
+   * POST /ingrediants
+   */
+  @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'CHEF')                                           
   @UseInterceptors(FileInterceptor('image'))
@@ -61,79 +130,47 @@ export class IngrediantsController {
     return this.ingredientsService.createIngredient(dto);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.ingredientsService.getIngredientById(id);
-  }
-
-  @Get('slug/:slug')
-  findBySlug(@Param('slug') slug: string) {
-    return this.ingredientsService.getIngredientBySlug(slug);
-  }
-
-  @Get()
-  search(@Query() searchIngredientsDto: SearchIngredientsDto) {
-    return this.ingredientsService.searchIngredients(searchIngredientsDto);
-  }
-
   /**
-   * Get ingredients by season
-   * GET /ingredients/season/:season?limit=50
+   * Update ingredient
+   * PATCH /ingrediants/:id
    */
-  @Get('season/:season')
-  async getIngredientsBySeason(
-    @Param('season') seasonParam: string,
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'CHEF')
+  @UseInterceptors(FileInterceptor('image'))
+  async updateIngredient(
+    @Param('id') id: string,
+    @Body() dto: UpdateIngredientDto,
+    @UploadedFile() image: Express.Multer.File,
   ) {
-    const season = Season[seasonParam.toUpperCase() as keyof typeof Season];
-    console.log(season);
-    return this.ingredientsService.getIngredientsBySeason(season, limit);
-  }
-
-  @Get('filter/:categoryId')
-  async fetchIngrediantsById(@Param('categoryId') categoryId: string) {
-    if (!categoryId) {
-      throw new BadRequestException('Bad request');
+    let imageUrl = dto.imageUrl;
+    if (image) {
+      imageUrl = await this.s3Serice.uploadIngredientImage(image);
     }
-    return this.ingredientsService.getIngredientByCategory(categoryId)
-
+    dto.imageUrl = imageUrl;
+    return this.ingredientsService.updateIngredient(id, dto);
   }
 
   /**
-   * Get vegetables only
-   * GET /ingredients/vegetables?limit=50
+   * Verify ingredient
+   * PATCH /ingrediants/:id/verify
    */
-  @Get('vegetables')
-  async getVegetables(
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
-  ) {
-    return this.ingredientsService.getVegetables(limit);
-  }
-
-  /**
-   * Get fruits only
-   * GET /ingredients/fruits?limit=50
-   */
-  @Get('fruits')
-  async getFruits(
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
-  ) {
-    return this.ingredientsService.getFruits(limit);
-  }
-
   @Patch(':id/verify')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   verify(@Param('id') id: string) {
     return this.ingredientsService.verifyIngredient(id);
   }
 
+  /**
+   * Delete ingredient
+   * DELETE /ingrediants/:id
+   */
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   remove(@Param('id') id: string) {
     return this.ingredientsService.deleteIngredient(id);
-  }
-
-  @Get('')
-  async fetchAllIngrediants() {
-    return this.ingredientsService.fetchAllIngrediants();
   }
 }
 
