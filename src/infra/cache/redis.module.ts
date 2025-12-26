@@ -6,6 +6,10 @@ import { RedisHealthController } from './redis.controller';
 
 
 
+
+function handleConnectionError(err:any){
+  console.error
+}
 @Global()
 @Module({
   imports: [ConfigModule],

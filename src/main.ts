@@ -14,13 +14,14 @@ async function bootstrap() {
   });
   
   app.setGlobalPrefix('api');
+  app.enableCors();
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Remove unknown properties
-      forbidNonWhitelisted: true, // Throw error on unknown properties
-      transform: true, // Auto-transform payload to DTO instance
+      whitelist: true, 
+      forbidNonWhitelisted: true, 
+      transform: true, 
       transformOptions: {
-        enableImplicitConversion: true, // Auto-convert types
+        enableImplicitConversion: true, 
       },
     }),
   );

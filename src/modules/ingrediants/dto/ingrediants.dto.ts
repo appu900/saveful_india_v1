@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { IngredientType, Season, UserRole } from '@prisma/client';
+import { isNativeError } from 'util/types';
 
 export class CreateIngredientDto {
   @IsString()
@@ -22,7 +23,15 @@ export class CreateIngredientDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => value ? (Array.isArray(value) ? value : typeof value === 'string' ? JSON.parse(value) : []) : [])
+  @Transform(({ value }) =>
+    value
+      ? Array.isArray(value)
+        ? value
+        : typeof value === 'string'
+          ? JSON.parse(value)
+          : []
+      : [],
+  )
   aliases?: string[];
 
   @IsOptional()
@@ -33,10 +42,9 @@ export class CreateIngredientDto {
   @IsString()
   description?: string;
 
+
   @IsOptional()
-  @IsObject()
-  @Type(() => Object)
-  @Transform(({ value }) => value ? (typeof value === 'string' ? JSON.parse(value) : value) : undefined)
+  @IsString()
   nutritionInfo?: any;
 
   @IsOptional()
@@ -46,7 +54,15 @@ export class CreateIngredientDto {
   @IsOptional()
   @IsArray()
   @IsEnum(Season, { each: true })
-  @Transform(({ value }) => value ? (Array.isArray(value) ? value : typeof value === 'string' ? JSON.parse(value) : []) : [])
+  @Transform(({ value }) =>
+    value
+      ? Array.isArray(value)
+        ? value
+        : typeof value === 'string'
+          ? JSON.parse(value)
+          : []
+      : [],
+  )
   availableSeasons?: Season[];
 
   @IsOptional()
@@ -81,8 +97,24 @@ export class CreateIngredientDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => value ? (Array.isArray(value) ? value : typeof value === 'string' ? JSON.parse(value) : []) : [])
+  @Transform(({ value }) =>
+    value
+      ? Array.isArray(value)
+        ? value
+        : typeof value === 'string'
+          ? JSON.parse(value)
+          : []
+      : [],
+  )
   tags?: string[];
+
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true')
+  isFruit: boolean;
+
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true')
+  isVegetable: boolean;
 
   @IsOptional()
   @IsEnum(UserRole)
