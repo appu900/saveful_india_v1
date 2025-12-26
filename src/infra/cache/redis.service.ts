@@ -90,4 +90,9 @@ export class RedisService implements OnModuleDestroy, OnModuleInit {
   getClient(): RedisClientType {
     return this.client;
   }
+
+  async cacheInvalid(key: string): Promise<void> {
+    if (!this.isConnected) return;
+    await this.client.del(key);
+  }
 }
