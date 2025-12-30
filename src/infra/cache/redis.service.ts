@@ -1,99 +1,99 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
 import { createClient, RedisClientType } from 'redis';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class RedisService implements OnModuleDestroy, OnModuleInit {
+export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: RedisClientType;
-  private isConnected = false;
-  constructor(private config: ConfigService) {}
+  private readonly logger = new Logger(RedisService.name);
+
+  constructor(private readonly config: ConfigService) {}
 
   async onModuleInit() {
-    try {
-      this.client = createClient({
-        url: this.config.get('REDIS_URL', 'redis://localhost:6379'),
-        socket: {
-          reconnectStrategy: (retries) => {
-            if (retries > 10) {
-              console.error('Redis:Max connection attempt reached');
-              return new Error('Max connection ateemptd reached');
-            }
-            return Math.min(retries * 100, 3000);
-          },
-        },
-      });
-      this.client.on('error', (err) => console.error('Redis Error:', err));
-      this.client.on('connect', () => console.log('Redis connecting...'));
-      this.client.on('ready', () => {
-        console.log('Redis connected and ready');
-        this.isConnected = true;
-      });
-      this.client.on('end', () => {
-        console.log('Redis connection closed');
-        this.isConnected = false;
-      });
+    const redisUrl =
+      this.config.get<string>('REDIS_URL') || 'redis://localhost:6379';
 
-      await this.client.connect();
-    } catch (error) {
-      console.error('Failed to connect to redis', error);
-      throw error;
-    }
+    this.client = createClient({
+      url: redisUrl,
+      socket: {
+        reconnectStrategy: (retries) => {
+          if (retries > 10) {
+            this.logger.error('Redis max reconnect attempts reached');
+            return new Error('Redis connection failed');
+          }
+          return Math.min(retries * 200, 3000);
+        },
+      },
+    });
+
+    this.client.on('connect', () => {
+      this.logger.log('Redis connecting...');
+    });
+
+    this.client.on('ready', () => {
+      this.logger.log('Redis connected & ready');
+    });
+
+    this.client.on('error', (err) => {
+      this.logger.error('Redis error', err);
+    });
+
+    this.client.on('end', () => {
+      this.logger.warn('Redis connection closed');
+    });
+
+    await this.client.connect();
   }
 
   async onModuleDestroy() {
-    if (this.client && this.isConnected) {
+    if (this.client?.isOpen) {
       await this.client.quit();
-      console.log('Redis connection closed gracefully');
+      this.logger.log('Redis connection closed gracefully');
     }
   }
 
+
   async get(key: string): Promise<string | null> {
-    if (!this.isConnected) return null;
-    return this.client.get(key);
+    return this.client?.isOpen ? this.client.get(key) : null;
   }
 
-  async set(key: string, value: string): Promise<void> {
-    if (!this.isConnected) return;
-    await this.client.set(key, value);
-  }
+  async set(key: string, value: string, ttl?: number): Promise<void> {
+    if (!this.client?.isOpen) return;
 
-  async setex(key: string, seconds: number, value: string): Promise<void> {
-    if (!this.isConnected) return;
-    await this.client.setEx(key, seconds, value);
+    if (ttl) {
+      await this.client.setEx(key, ttl, value);
+    } else {
+      await this.client.set(key, value);
+    }
   }
 
   async del(...keys: string[]): Promise<number> {
-    if (!this.isConnected || keys.length === 0) return 0;
-    return this.client.del(keys);
+    return this.client?.isOpen ? this.client.del(keys) : 0;
   }
 
   async exists(...keys: string[]): Promise<number> {
-    if (!this.isConnected) return 0;
-    return this.client.exists(keys);
+    return this.client?.isOpen ? this.client.exists(keys) : 0;
+  }
+
+  async ttl(key: string): Promise<number> {
+    return this.client?.isOpen ? this.client.ttl(key) : -1;
   }
 
   async keys(pattern: string): Promise<string[]> {
-    if (!this.isConnected) return [];
-    return this.client.keys(pattern);
-  }
-  async ttl(key: string): Promise<number> {
-    if (!this.isConnected) return -1;
-    return this.client.ttl(key);
+    return this.client?.isOpen ? this.client.keys(pattern) : [];
   }
 
-  //   ** health checkup endpoints
-  async ping() {
-    if (!this.isConnected) return 'PONG';
-    return this.client.ping();
+  async ping(): Promise<string> {
+    return this.client?.isOpen ? this.client.ping() : 'PONG';
   }
 
   getClient(): RedisClientType {
     return this.client;
   }
 
-  async cacheInvalid(key: string): Promise<void> {
-    if (!this.isConnected) return;
+  async cacheInvalidate(key: string): Promise<void> {
+    if (!this.client?.isOpen) return;
     await this.client.del(key);
-    console.log(`Cache invalidated for key: ${key}`);
+    this.logger.log(`Cache invalidated: ${key}`);
   }
 }
