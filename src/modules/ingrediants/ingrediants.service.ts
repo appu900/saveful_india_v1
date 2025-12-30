@@ -161,10 +161,10 @@ export class IngrediantsService {
     if (!ingredient) {
       throw new NotFoundException(`Ingredient with ID ${id} not found`);
     }
-    await this.redis.setex(
+    await this.redis.set(
       cacheKey,
-      this.CACHE_TTL,
       JSON.stringify(ingredient),
+      this.CACHE_TTL,
     );
     return ingredient;
   }
@@ -188,10 +188,10 @@ export class IngrediantsService {
     if (!ingredient) {
       throw new NotFoundException(`Ingredient with slug ${slug} not found`);
     }
-    await this.redis.setex(
+    await this.redis.set(
       cacheKey,
-      this.CACHE_TTL,
       JSON.stringify(ingredient),
+      this.CACHE_TTL,
     );
     return ingredient;
   }
@@ -259,7 +259,7 @@ export class IngrediantsService {
         hasMore: offset + limit < total,
       },
     };
-    await this.redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(result));
+    await this.redis.set(cacheKey, JSON.stringify(result), this.CACHE_TTL);
     return result;
   }
 
@@ -327,10 +327,10 @@ export class IngrediantsService {
         },
       },
     });
-    await this.redis.setex(
+    await this.redis.set(
       cacheKey,
-      this.CACHE_TTL,
       JSON.stringify(categories),
+      this.CACHE_TTL,
     );
     return categories;
   }

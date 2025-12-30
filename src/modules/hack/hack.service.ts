@@ -24,7 +24,7 @@ export class HackService {
       },
     });
     this.logger.log(`Hack category created with ID: ${category.id}`);
-    await this.redisService.cacheInvalid(cacheKey);
+    await this.redisService.cacheInvalidate(cacheKey);
     return category;
   }
 

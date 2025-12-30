@@ -55,10 +55,10 @@ export class RateLimitGuard implements CanActivate {
 
     const newCount = count + 1;
     if (count == 0) {
-      await this.redis.setex(
+      await this.redis.set(
         key,
-        Math.floor(rateLimitConfig.ttl / 1000),
         newCount.toString(),
+        Math.floor(rateLimitConfig.ttl / 1000),
       );
     } else {
       await this.redis.set(key, newCount.toString());

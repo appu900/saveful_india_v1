@@ -216,7 +216,7 @@ export class RecipeService {
     // Cache the result
     try {
       const serialized = JSON.stringify(recipe);
-      await this.redisService.setex(cacheKey, this.CACHE_TTL, serialized);
+      await this.redisService.set(cacheKey, serialized, this.CACHE_TTL);
       console.log('cache set for recipe:', cacheKey);
     } catch (error) {
       this.logger.error(`Failed to set cache: ${cacheKey}`, error);
@@ -271,7 +271,7 @@ export class RecipeService {
 
     try {
       const serialized = JSON.stringify(recipe);
-      await this.redisService.setex(cacheKey, this.CACHE_TTL, serialized);
+      await this.redisService.set(cacheKey, serialized, this.CACHE_TTL);
     } catch (error) {
       this.logger.error(`Failed to set cache: ${cacheKey}`, error);
     }
@@ -315,7 +315,7 @@ export class RecipeService {
 
     try {
       const serialized = JSON.stringify(result);
-      await this.redisService.setex(cacheKey, this.CACHE_TTL, serialized);
+      await this.redisService.set(cacheKey, serialized, this.CACHE_TTL);
     } catch (error) {
       this.logger.error(`Failed to set cache: ${cacheKey}`, error);
     }
@@ -349,7 +349,7 @@ export class RecipeService {
 
     try {
       const serialized = JSON.stringify(recipes);
-      await this.redisService.setex(cacheKey, this.CACHE_TTL, serialized);
+      await this.redisService.set(cacheKey, serialized, this.CACHE_TTL);
     } catch (error) {
       this.logger.error(`Failed to set cache: ${cacheKey}`, error);
     }
@@ -392,7 +392,7 @@ export class RecipeService {
 
     try {
       const serialized = JSON.stringify(result);
-      await this.redisService.setex(cacheKey, this.CACHE_TTL, serialized);
+      await this.redisService.set(cacheKey, serialized, this.CACHE_TTL);
     } catch (error) {
       this.logger.error(`Failed to set cache: ${cacheKey}`, error);
     }
@@ -517,10 +517,10 @@ export class RecipeService {
     // Cache search results for 5 minutes
     try {
       const serialized = JSON.stringify(result);
-      await this.redisService.setex(
+      await this.redisService.set(
         cacheKey,
-        this.SEARCH_CACHE_TTL,
         serialized,
+        this.SEARCH_CACHE_TTL,
       );
     } catch (error) {
       this.logger.error(`Failed to set cache: ${cacheKey}`, error);
